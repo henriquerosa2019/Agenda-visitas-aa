@@ -1,0 +1,6 @@
+{
+  "name": "Escala de Visitas AA",
+  "description": "Agenda e escala de visitas do Grupo de Serviço AA com organização cronológica, sinalização de status por cores e gerenciamento completo de locais e voluntários.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
