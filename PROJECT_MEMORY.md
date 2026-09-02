@@ -92,7 +92,7 @@ git push origin main
 - **Cenários Cobertos:**
   1. **Novo Voluntário Cadastrado:** Detecta novos nomes inseridos nas vagas e envia e-mail comemorativo/informativo com presença confirmada.
   2. **Voluntário Retirou o Nome:** Detecta nomes apagados/removidos e envia e-mail de atenção informando a desistência e que a vaga reabriu.
-- **Remetente Autorizado:** `henrique.rosa@poli.ufrj.br` (exibido como *"Agenda de Visitas A.A."*).
+- **Remetente Autorizado:** `henrique.rosa@poli.ufrj.br` (exibido como *"Agenda de Visitas A.A."*, agora **Verificado** no Brevo).
 
 ### 3. Relatório Periódico Consolidado (GitHub Actions ➔ Brevo API)
 - **Despertador / Cron:** `.github/workflows/daily-analysis.yml`
