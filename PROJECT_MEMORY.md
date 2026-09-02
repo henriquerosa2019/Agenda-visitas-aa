@@ -77,3 +77,35 @@ git push origin main
 - **Horário e Formato Definidos:** A execução ocorre periodicamente: **Segundas-feiras às 08:00** e **Sextas-feiras às 20:00** (horário de Brasília) via GitHub Actions, com o escopo completo: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados (unificados), 4. Locais Agendados (apenas agendados com dia/hora), 5. Status dos Resumos.
 - **Persistência de Histórico:** Resultados automáticos são gravados em `RELATORIO_VISITAS.md`.
 - **Disparo em Tempo Real pelo Supabase:** A inclusão e desmarcação de voluntários dispara e-mails imediatamente via Trigger SQL no Supabase. O relatório geral completo é disparado pelo GitHub Actions nas segundas às 08:00 e sextas às 20:00.
+
+---
+
+## 📧 Arquitetura de Notificações e Relatórios (Brevo & Supabase)
+
+### 1. Destinatários Oficiais
+- **Henrique Rosa:** `henrique.rosa@poli.ufrj.br`
+- **Danilo Diniz:** `dinizdanfer@gmail.com`
+
+### 2. Notificações em Tempo Real (Supabase ➔ Brevo API)
+- **Gatilho no Banco:** Trigger PostgreSQL `on_volunteer_change` na tabela `public.aa_visits` (executa a função `public.tr_notify_volunteer_changes()`).
+- **Extensão Utilizada:** `pg_net` executando chamadas HTTP assíncronas para a API REST v3 do Brevo (`https://api.brevo.com/v3/smtp/email`).
+- **Cenários Cobertos:**
+  1. **Novo Voluntário Cadastrado:** Detecta novos nomes inseridos nas vagas e envia e-mail comemorativo/informativo com presença confirmada.
+  2. **Voluntário Retirou o Nome:** Detecta nomes apagados/removidos e envia e-mail de atenção informando a desistência e que a vaga reabriu.
+- **Remetente Autorizado:** `henrique.rosa@poli.ufrj.br` (exibido como *"Agenda de Visitas A.A."*).
+
+### 3. Relatório Periódico Consolidado (GitHub Actions ➔ Brevo API)
+- **Despertador / Cron:** `.github/workflows/daily-analysis.yml`
+  - **Segunda-feira às 08:00 BRT** (`0 11 * * 1`)
+  - **Sexta-feira às 20:00 BRT** (`0 23 * * 5`)
+- **Processamento:** `scripts/analyze-visits.mjs`
+  - Consulta o Supabase e compila os 5 itens: Resumo Geral, Status das Vagas, Voluntários Agendados (com unificação de grafias como `Marcio.Motta` e `Marcio Motta`), Locais Agendados (apenas instituições com agendamento ativo, contendo Local, Dia, Hora e Nomes) e Status dos Resumos de Visita.
+  - Diagrama o e-mail em HTML nas cores oficiais de A.A. e envia via Brevo para Henrique e Danilo.
+
+### 4. Resolução de Rede & IP Dinâmico
+- **Forçar IPv4:** Configurado `--dns-result-order=ipv4first` no script `analyze` do `package.json` e no arquivo batch `scripts/run-daily-analysis.bat` para garantir conectividade direta via IPv4 homologado no Brevo.
+- **Retentativas Automáticas:** O script `scripts/analyze-visits.mjs` possui retry automático (até 3 tentativas) para tolerar oscilações momentâneas de conexão.
+
+### 5. Integridade do Código do App
+- O código da aplicação em `src/` permanece **100% puro e intacto**: sem lógicas de disparo de e-mail no navegador do cliente, preservando leveza, velocidade e segurança.
+
