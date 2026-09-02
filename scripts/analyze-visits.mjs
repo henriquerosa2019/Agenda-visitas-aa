@@ -69,15 +69,16 @@ async function sendReportEmail({
   visitasComResumo,
   visitasSemResumo,
 }) {
-  const apiKey = (process.env.RESEND_API_KEY || '').trim();
-  const rawEmails = process.env.REPORT_EMAIL_TO || 'henrique.rosa@poli.ufrj.br';
+  const brevoKey = (process.env.BREVO_API_KEY || '').trim();
+  const resendKey = (process.env.RESEND_API_KEY || '').trim();
+  const rawEmails = process.env.REPORT_EMAIL_TO || 'dinizdanfer@gmail.com';
   const toEmails = rawEmails
     .split(',')
     .map((e) => e.trim())
     .filter(Boolean);
 
-  if (!apiKey) {
-    console.log('ℹ️ RESEND_API_KEY não configurada. Envio de e-mail ignorado.');
+  if (!brevoKey && !resendKey) {
+    console.log('ℹ️ Nenhuma chave de e-mail (Brevo ou Resend) configurada. Envio ignorado.');
     return;
   }
 
@@ -260,30 +261,77 @@ async function sendReportEmail({
 </html>
   `;
 
-  try {
-    console.log(`\n✉️ Enviando relatório por e-mail para: ${toEmails.join(', ')}...`);
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Agenda AA <onboarding@resend.dev>',
-        to: toEmails,
-        subject: `📊 Relatório Diário de Visitas A.A. — ${dateFormatted}`,
-        html: html,
-      }),
-    });
+  let attempts = 0;
+  const maxAttempts = 3;
 
-    const data = await response.json();
-    if (response.ok) {
-      console.log(`✅ E-mail enviado com sucesso para ${toEmails.join(', ')}! (ID: ${data.id})\n`);
-    } else {
-      console.error('❌ Falha na resposta do Resend:', data);
+  while (attempts < maxAttempts) {
+    attempts++;
+    try {
+      if (attempts === 1) {
+        console.log(`\n✉️ Enviando relatório por e-mail para: ${toEmails.join(', ')}...`);
+      } else {
+        console.log(`\n🔄 Tentativa ${attempts} de ${maxAttempts} para: ${toEmails.join(', ')}...`);
+      }
+
+      if (brevoKey) {
+        const senderEmail = (process.env.BREVO_SENDER_EMAIL || 'henrique.rosa@poli.ufrj.br').trim();
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': brevoKey,
+            'Content-Type': 'application/json',
+            accept: 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { name: 'Agenda de Visitas A.A.', email: senderEmail },
+            to: toEmails.map((email) => ({ email })),
+            subject: `📊 Relatório de Visitas A.A. — ${dateFormatted}`,
+            htmlContent: html,
+          }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          console.log(`✅ E-mail enviado com sucesso via Brevo para ${toEmails.join(', ')}! (MessageId: ${data.messageId})\n`);
+          return;
+        } else {
+          console.error('❌ Resposta do Brevo:', data);
+          return;
+        }
+      } else {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'Agenda AA <onboarding@resend.dev>',
+            to: toEmails,
+            subject: `📊 Relatório de Visitas A.A. — ${dateFormatted}`,
+            html: html,
+          }),
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          console.log(`✅ E-mail enviado com sucesso via Resend para ${toEmails.join(', ')}! (ID: ${data.id})\n`);
+          return;
+        } else {
+          console.error('❌ Resposta do Resend:', data);
+          return;
+        }
+      }
+    } catch (err) {
+      const cause = err.cause ? ` (${err.cause.code || err.cause.message || err.cause})` : '';
+      console.error(`⚠️ Oscilação de rede na tentativa ${attempts}: ${err.message}${cause}`);
+      if (attempts < maxAttempts) {
+        console.log('⏳ Aguardando 2 segundos para tentar novamente...');
+        await new Promise((r) => setTimeout(r, 2000));
+      } else {
+        console.error('❌ Todas as tentativas falharam devido à instabilidade na conexão.');
+      }
     }
-  } catch (err) {
-    console.error('❌ Falha de rede ao conectar com Resend:', err.message);
   }
 }
 

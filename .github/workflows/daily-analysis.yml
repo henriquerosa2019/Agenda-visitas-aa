@@ -28,7 +28,9 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://pyydnicvltkioovtvzfk.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5eWRuaWN2bHRraW9vdnR2emZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTUwMzEsImV4cCI6MjA5MDYzMTAzMX0.-_d2zNCPnoNPJBaGnc2JUmq_uj2Xi7FUETQC-ViQ4Ew' }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO || 'henrique.rosa@poli.ufrj.br' }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL || 'henrique.rosa@poli.ufrj.br' }}
+          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO || 'henrique.rosa@poli.ufrj.br, dinizdanfer@gmail.com' }}
         run: npm run analyze
 
       - name: Publicar Resumo no Painel do GitHub

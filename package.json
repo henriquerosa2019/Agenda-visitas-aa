@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "analyze": "node scripts/analyze-visits.mjs"
+    "analyze": "node --dns-result-order=ipv4first scripts/analyze-visits.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

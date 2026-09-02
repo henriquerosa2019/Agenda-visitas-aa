@@ -1,5 +1,5 @@
 # 📊 Relatório Diário de Visitas A.A.
-*Gerado em: 02/09/2026 às 10:53:59*
+*Gerado em: 02/09/2026 às 13:34:14*
 
 ## 📈 1. Resumo Geral das Escalas
 - **Total de Visitas Cadastradas:** 5
@@ -8,9 +8,9 @@
 - **Visitas Futuras no Calendário:** 5
 
 ## 👥 2. Status das Vagas de Voluntários
-- **Total de Vagas Disponibilizadas:** 13
-- **Vagas Confirmadas/Preenchidas:** 4 (30.8%)
-- **Vagas Ainda em Aberto:** 9
+- **Total de Vagas Disponibilizadas:** 12
+- **Vagas Confirmadas/Preenchidas:** 4 (33.3%)
+- **Vagas Ainda em Aberto:** 8
 
 ## 🤝 3. Voluntários Agendados
 - **Marcio Motta:** 3 visita(s)
