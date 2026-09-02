@@ -12,11 +12,8 @@ import { INITIAL_AGENDA } from './data/initialData';
 import { AALogo } from './components/AALogo';
 import { EditVisitModal } from './components/EditVisitModal';
 import { VisitSummaryModal } from './components/VisitSummaryModal';
-import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import {
   getSupabaseClient,
-  getSupabaseConfig,
-  saveSupabaseConfig,
   fetchVisitsFromSupabase,
   upsertVisitToSupabase,
   bulkUpsertVisits,
@@ -86,8 +83,6 @@ export default function App() {
   const [summaryModalOpen, setSummaryModalOpen] = useState<boolean>(false);
   const [summaryVisit, setSummaryVisit] = useState<VisitItem | null>(null);
 
-  // Modal de Configuração do Supabase
-  const [configModalOpen, setConfigModalOpen] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
 
   // Debounce timers para digitação de voluntários
@@ -381,55 +376,59 @@ export default function App() {
         <div className="flex items-center gap-2">
           {syncStatus === 'connected' && (
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setConfigModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all cursor-pointer shadow-xs"
-                title="Supabase Conectado - Clique para ver configurações"
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-xs select-none"
+                title="Sincronização em nuvem ativa"
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>Nuvem Conectada</span>
-              </button>
+              </div>
               <button
                 type="button"
                 onClick={syncFromSupabase}
-                className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-white/80 hover:text-white hover:bg-white/15 transition-all cursor-pointer"
                 title="Recarregar dados da nuvem agora"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin text-amber-300' : ''}`} />
               </button>
             </div>
           )}
 
           {syncStatus === 'syncing' && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-amber-400/20 text-amber-200 border border-amber-400/40 shadow-xs">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-amber-400/20 text-amber-200 border border-amber-400/40 shadow-xs select-none">
               <RefreshCw className="w-3 h-3 animate-spin text-amber-300" />
               <span>Salvando na nuvem...</span>
             </div>
           )}
 
           {syncStatus === 'error' && (
-            <button
-              type="button"
-              onClick={() => setConfigModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-red-500/20 text-red-200 border border-red-400/40 hover:bg-red-500/30 transition-all cursor-pointer shadow-xs"
-              title="Erro ao sincronizar. Clique para verificar as chaves"
-            >
-              <span className="w-2 h-2 rounded-full bg-red-400"></span>
-              <span>Erro na Nuvem</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-red-500/20 text-red-200 border border-red-400/40 shadow-xs select-none"
+                title="Erro de conexão com a nuvem"
+              >
+                <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                <span>Erro na Nuvem</span>
+              </div>
+              <button
+                type="button"
+                onClick={syncFromSupabase}
+                className="p-1.5 rounded-full text-white/80 hover:text-white hover:bg-white/15 transition-all cursor-pointer"
+                title="Tentar reconectar"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
 
           {(syncStatus === 'offline' || syncStatus === 'idle') && (
-            <button
-              type="button"
-              onClick={() => setConfigModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-white/10 hover:bg-white/20 text-white/80 border border-white/20 transition-all cursor-pointer shadow-xs"
-              title="Conectar com o Supabase"
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-white/10 text-white/70 border border-white/20 shadow-xs select-none"
+              title="Modo offline"
             >
               <Database className="w-3.5 h-3.5 text-[#E4C687]" />
-              <span>Conectar Nuvem</span>
-            </button>
+              <span>Offline</span>
+            </div>
           )}
         </div>
 
@@ -770,18 +769,6 @@ export default function App() {
         onClose={() => setSummaryModalOpen(false)}
         onSaveSummary={handleSaveVisitSummary}
         visit={summaryVisit}
-      />
-
-      {/* Modal de Configuração do Supabase */}
-      <SupabaseConfigModal
-        isOpen={configModalOpen}
-        onClose={() => setConfigModalOpen(false)}
-        onSaveConfig={(url, key) => {
-          saveSupabaseConfig(url, key);
-          syncFromSupabase();
-        }}
-        currentUrl={getSupabaseConfig().url}
-        currentKey={getSupabaseConfig().key}
       />
     </div>
   );
