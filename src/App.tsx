@@ -22,6 +22,7 @@ import {
   bulkUpsertVisits,
   deleteVisitFromSupabase,
   subscribeToVisitsChanges,
+  mergeLocalAndRemoteVisits,
 } from './lib/supabase';
 import {
   FileText,
@@ -125,11 +126,19 @@ export default function App() {
         }
         setSyncStatus('connected');
       } else {
-        // Banco tem visitas: atualizar o estado local
+        // Mesclar visitas do banco com preenchimentos que já estavam salvos no aparelho do usuário
+        const { merged, hasLocalChanges } = mergeLocalAndRemoteVisits(state.visits, remoteVisits);
+
         setState((prev) => ({
           ...prev,
-          visits: sortVisitsAscending(remoteVisits),
+          visits: sortVisitsAscending(merged),
         }));
+
+        // Se o celular do usuário continha voluntários nas vagas que ainda não estavam no banco, envia para o Supabase!
+        if (hasLocalChanges) {
+          await bulkUpsertVisits(merged);
+        }
+
         setSyncStatus('connected');
       }
     } catch (err) {

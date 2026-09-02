@@ -88,6 +88,87 @@ export function mapRowToVisit(row: any): VisitItem {
   };
 }
 
+export function mergeLocalAndRemoteVisits(
+  localVisits: VisitItem[],
+  remoteVisits: VisitItem[]
+): { merged: VisitItem[]; hasLocalChanges: boolean } {
+  let hasLocalChanges = false;
+  const remoteMap = new Map<string, VisitItem>();
+  remoteVisits.forEach((v) => remoteMap.set(v.id, v));
+
+  const result: VisitItem[] = [];
+
+  // Percorrer as visitas remotas e mesclar preenchimentos locais existentes
+  for (const remote of remoteVisits) {
+    const local = localVisits.find((v) => v.id === remote.id);
+    if (!local) {
+      result.push(remote);
+      continue;
+    }
+
+    // Mesclar slots: se o remoto tem vaga aberta (""), mas o local tem voluntário gravado, preserva o voluntário!
+    const maxSlots = Math.max(remote.slots.length, local.slots.length);
+    const mergedSlots: string[] = [];
+    let slotsChanged = false;
+
+    for (let i = 0; i < maxSlots; i++) {
+      const remName = (remote.slots[i] || '').trim();
+      const locName = (local.slots[i] || '').trim();
+
+      if (!remName && locName) {
+        // Local preencheu a vaga e remoto ainda estava em branco
+        mergedSlots.push(locName);
+        slotsChanged = true;
+      } else if (remName) {
+        // Remoto tem o nome
+        mergedSlots.push(remName);
+      } else {
+        mergedSlots.push('');
+      }
+    }
+
+    // Mesclar resumo da visita caso exista no aparelho e ainda não no banco
+    let mergedSummary = remote.visitSummary;
+    let mergedCompletedAt = remote.completedAt;
+    let mergedCompletedBy = remote.completedBy;
+    let mergedIsCompleted = remote.isCompleted;
+
+    if (!remote.visitSummary && local.visitSummary) {
+      mergedSummary = local.visitSummary;
+      mergedCompletedAt = local.completedAt || new Date().toISOString();
+      mergedCompletedBy = local.completedBy;
+      mergedIsCompleted = local.isCompleted;
+      slotsChanged = true;
+    }
+
+    if (slotsChanged) {
+      hasLocalChanges = true;
+    }
+
+    result.push({
+      ...remote,
+      slots: mergedSlots,
+      visitSummary: mergedSummary,
+      completedAt: mergedCompletedAt,
+      completedBy: mergedCompletedBy,
+      isCompleted: mergedIsCompleted || Boolean(mergedSummary),
+    });
+  }
+
+  // Se houver algum local criado exclusivamente no aparelho do usuário
+  for (const local of localVisits) {
+    if (!remoteMap.has(local.id)) {
+      result.push(local);
+      hasLocalChanges = true;
+    }
+  }
+
+  return {
+    merged: result,
+    hasLocalChanges,
+  };
+}
+
 export async function fetchVisitsFromSupabase(): Promise<VisitItem[] | null> {
   const client = getSupabaseClient();
   if (!client) return null;
