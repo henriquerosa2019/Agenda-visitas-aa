@@ -58,6 +58,9 @@ Este documento registra todas as decisões de design, regras de negócio, arquit
 # Rodar localmente
 npm run dev
 
+# Rodar a análise diária dos agendamentos no Supabase
+npm run analyze
+
 # Gerar build de produção
 npm run build
 
@@ -66,3 +69,11 @@ git add .
 git commit -m "Descrição da alteração"
 git push origin main
 ```
+
+---
+
+## ⏰ Diretriz Permanente do Agendador de Tarefas do Assistente
+- **Autonomia Total:** Sempre que qualquer tarefa for agendada pelo assistente no projeto, ela deve ser configurada e executada de forma **100% autônoma**, sem requerer intervenção manual, confirmação ou cliques do usuário.
+- **Horário e Formato Definidos:** A execução deve ocorrer rigorosamente no horário programado (ex: diariamente às 08:00) e obedecer ao escopo acordado: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados, 4. Locais Agendados (local, data/horário e visitantes agendados), 5. Status dos Resumos.
+- **Persistência de Histórico:** Resultados automáticos devem ser reportados diretamente e gravados nos registros locais (`RELATORIO_VISITAS.md` e logs).
+- **Disparo de E-mail Diário:** Envio automático do relatório em HTML diagramado para `henrique.rosa@poli.ufrj.br` via Resend API (`RESEND_API_KEY`), tanto via execução local quanto via GitHub Actions na nuvem.

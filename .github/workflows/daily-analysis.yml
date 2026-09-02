@@ -1,0 +1,37 @@
+name: Análise Diária de Visitas AA
+
+on:
+  schedule:
+    # Executa todos os dias às 08:00 (horário de Brasília = 11:00 UTC)
+    - cron: '0 11 * * *'
+  workflow_dispatch: # Permite rodar manualmente com 1 clique no GitHub
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar Análise das Visitas no Supabase
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://pyydnicvltkioovtvzfk.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5eWRuaWN2bHRraW9vdnR2emZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTUwMzEsImV4cCI6MjA5MDYzMTAzMX0.-_d2zNCPnoNPJBaGnc2JUmq_uj2Xi7FUETQC-ViQ4Ew' }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO || 'henrique.rosa@poli.ufrj.br' }}
+        run: npm run analyze
+
+      - name: Publicar Resumo no Painel do GitHub
+        if: always()
+        run: |
+          if [ -f RELATORIO_VISITAS.md ]; then
+            cat RELATORIO_VISITAS.md >> $GITHUB_STEP_SUMMARY
+          fi
