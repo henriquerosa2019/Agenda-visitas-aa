@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AgendaData,
   VisitItem,
@@ -12,10 +12,31 @@ import { INITIAL_AGENDA } from './data/initialData';
 import { AALogo } from './components/AALogo';
 import { EditVisitModal } from './components/EditVisitModal';
 import { VisitSummaryModal } from './components/VisitSummaryModal';
-import { getSupabaseClient } from './lib/supabase';
-import { FileText, CheckCircle2, MessageSquareText, Calendar, Clock, Plus } from 'lucide-react';
+import { SupabaseConfigModal } from './components/SupabaseConfigModal';
+import {
+  getSupabaseClient,
+  getSupabaseConfig,
+  saveSupabaseConfig,
+  fetchVisitsFromSupabase,
+  upsertVisitToSupabase,
+  bulkUpsertVisits,
+  deleteVisitFromSupabase,
+  subscribeToVisitsChanges,
+} from './lib/supabase';
+import {
+  FileText,
+  CheckCircle2,
+  MessageSquareText,
+  Calendar,
+  Clock,
+  Plus,
+  RefreshCw,
+  Database,
+} from 'lucide-react';
 
 const CURRENT_STORAGE_KEY = 'escala_visitas_aa_data_v8';
+
+type SyncStatus = 'idle' | 'syncing' | 'connected' | 'error' | 'offline';
 
 export default function App() {
   const [state, setState] = useState<AgendaData>(() => {
@@ -31,7 +52,6 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.visits) && parsed.visits.length > 0) {
-          // Garante que a Clínica da Gávea ou qualquer visita sem confirmação venha limpa
           const cleanedVisits = parsed.visits.map((v: VisitItem) => {
             if (v.id === 'sept-14-10h' || v.name.toLowerCase().includes('gávea')) {
               return {
@@ -65,7 +85,14 @@ export default function App() {
   const [summaryModalOpen, setSummaryModalOpen] = useState<boolean>(false);
   const [summaryVisit, setSummaryVisit] = useState<VisitItem | null>(null);
 
-  // Salvar no LocalStorage e sincronizar
+  // Modal de Configuração do Supabase
+  const [configModalOpen, setConfigModalOpen] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+
+  // Debounce timers para digitação de voluntários
+  const debounceTimers = useRef<{ [key: string]: any }>({});
+
+  // Salvar no LocalStorage como cache offline de segurança
   useEffect(() => {
     try {
       localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
@@ -73,6 +100,73 @@ export default function App() {
       console.error(e);
     }
   }, [state]);
+
+  // Função para sincronizar dados com o Supabase
+  const syncFromSupabase = async () => {
+    const client = getSupabaseClient();
+    if (!client) {
+      setSyncStatus('offline');
+      return;
+    }
+
+    setSyncStatus('syncing');
+    try {
+      const remoteVisits = await fetchVisitsFromSupabase();
+
+      if (remoteVisits === null) {
+        setSyncStatus('error');
+        return;
+      }
+
+      if (remoteVisits.length === 0) {
+        // Banco está vazio: subir a lista de visitas atual para popular a nuvem
+        if (state.visits && state.visits.length > 0) {
+          await bulkUpsertVisits(state.visits);
+        }
+        setSyncStatus('connected');
+      } else {
+        // Banco tem visitas: atualizar o estado local
+        setState((prev) => ({
+          ...prev,
+          visits: sortVisitsAscending(remoteVisits),
+        }));
+        setSyncStatus('connected');
+      }
+    } catch (err) {
+      console.error('[Sync] Falha ao sincronizar com Supabase:', err);
+      setSyncStatus('error');
+    }
+  };
+
+  // Carregamento inicial e assinatura em Tempo Real (Realtime)
+  useEffect(() => {
+    syncFromSupabase();
+
+    // Ouvir alterações em tempo real de outros usuários
+    const unsubscribe = subscribeToVisitsChanges(async () => {
+      const updated = await fetchVisitsFromSupabase();
+      if (updated && updated.length > 0) {
+        setState((prev) => ({
+          ...prev,
+          visits: sortVisitsAscending(updated),
+        }));
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  // Helper para persistir visita no Supabase
+  const persistVisit = async (visit: VisitItem) => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    setSyncStatus('syncing');
+    const success = await upsertVisitToSupabase(visit);
+    setSyncStatus(success ? 'connected' : 'error');
+  };
 
   const sortedVisits = sortVisitsAscending(state.visits);
 
@@ -109,6 +203,9 @@ export default function App() {
         visits: sortVisitsAscending(updated),
       };
     });
+
+    // Gravar no Supabase
+    persistVisit(visit);
   };
 
   const handleSaveVisitSummary = (
@@ -118,108 +215,215 @@ export default function App() {
     isCompleted: boolean
   ) => {
     const completedAt = new Date().toISOString();
+    let updatedTarget: VisitItem | undefined;
 
-    setState((prev) => ({
-      ...prev,
-      visits: prev.visits.map((v) => {
+    setState((prev) => {
+      const newVisits = prev.visits.map((v) => {
         if (v.id !== visitId) return v;
-        return {
+        updatedTarget = {
           ...v,
           visitSummary: summary ? summary : undefined,
-          completedBy: undefined,
+          completedBy: completedBy || undefined,
           completedAt: summary ? completedAt : undefined,
           isCompleted: isCompleted ? true : false,
         };
-      }),
-    }));
+        return updatedTarget;
+      });
+      return {
+        ...prev,
+        visits: newVisits,
+      };
+    });
 
-    // Tentar salvar no Supabase se houver conexão configurada
-    const client = getSupabaseClient();
-    if (client) {
-      const targetVisit = state.visits.find((v) => v.id === visitId);
-      if (targetVisit) {
-        client
-          .from('aa_visits')
-          .upsert({
-            id: visitId,
-            name: targetVisit.name,
-            addr: targetVisit.addr,
-            date: targetVisit.date,
-            time: targetVisit.time,
-            slots: targetVisit.slots,
-            notes: targetVisit.notes || null,
-            visit_summary: summary || null,
-            completed_by: null,
-            completed_at: summary ? completedAt : null,
-          })
-          .then(() => {});
-      }
+    if (updatedTarget) {
+      persistVisit(updatedTarget);
     }
   };
 
-  const handleRemoveVisit = (id: string, name: string) => {
+  const handleRemoveVisit = async (id: string, name: string) => {
     if (!confirm(`Remover "${name}" e sua visita da agenda?`)) return;
     setState((prev) => ({
       ...prev,
       visits: prev.visits.filter((v) => v.id !== id),
     }));
+
+    const client = getSupabaseClient();
+    if (client) {
+      setSyncStatus('syncing');
+      const success = await deleteVisitFromSupabase(id);
+      setSyncStatus(success ? 'connected' : 'error');
+    }
   };
 
   const handleDateChange = (id: string, newDate: string) => {
-    setState((prev) => ({
-      ...prev,
-      visits: sortVisitsAscending(
-        prev.visits.map((v) => (v.id === id ? { ...v, date: newDate } : v))
-      ),
-    }));
+    let updatedTarget: VisitItem | undefined;
+    setState((prev) => {
+      const updated = prev.visits.map((v) => {
+        if (v.id === id) {
+          updatedTarget = { ...v, date: newDate };
+          return updatedTarget;
+        }
+        return v;
+      });
+      return {
+        ...prev,
+        visits: sortVisitsAscending(updated),
+      };
+    });
+
+    if (updatedTarget) {
+      persistVisit(updatedTarget);
+    }
   };
 
   const handleTimeChange = (id: string, newTime: string) => {
-    setState((prev) => ({
-      ...prev,
-      visits: sortVisitsAscending(
-        prev.visits.map((v) => (v.id === id ? { ...v, time: newTime } : v))
-      ),
-    }));
+    let updatedTarget: VisitItem | undefined;
+    setState((prev) => {
+      const updated = prev.visits.map((v) => {
+        if (v.id === id) {
+          updatedTarget = { ...v, time: newTime };
+          return updatedTarget;
+        }
+        return v;
+      });
+      return {
+        ...prev,
+        visits: sortVisitsAscending(updated),
+      };
+    });
+
+    if (updatedTarget) {
+      persistVisit(updatedTarget);
+    }
   };
 
   const handleSlotChange = (visitId: string, slotIdx: number, val: string) => {
-    setState((prev) => ({
-      ...prev,
-      visits: prev.visits.map((v) => {
+    let updatedTarget: VisitItem | undefined;
+    setState((prev) => {
+      const updatedVisits = prev.visits.map((v) => {
         if (v.id !== visitId) return v;
         const newSlots = [...v.slots];
         newSlots[slotIdx] = val;
-        return { ...v, slots: newSlots };
-      }),
-    }));
+        updatedTarget = { ...v, slots: newSlots };
+        return updatedTarget;
+      });
+      return {
+        ...prev,
+        visits: updatedVisits,
+      };
+    });
+
+    // Salvar com debounce de 600ms para aguardar término da digitação
+    if (updatedTarget) {
+      if (debounceTimers.current[visitId]) {
+        clearTimeout(debounceTimers.current[visitId]);
+      }
+      const targetToSave = { ...updatedTarget };
+      debounceTimers.current[visitId] = setTimeout(() => {
+        persistVisit(targetToSave);
+      }, 600);
+    }
   };
 
   const handleRemoveSlot = (visitId: string, slotIdx: number) => {
-    setState((prev) => ({
-      ...prev,
-      visits: prev.visits.map((v) => {
+    let updatedTarget: VisitItem | undefined;
+    setState((prev) => {
+      const updatedVisits = prev.visits.map((v) => {
         if (v.id !== visitId) return v;
         const newSlots = v.slots.filter((_, i) => i !== slotIdx);
-        return { ...v, slots: newSlots };
-      }),
-    }));
+        updatedTarget = { ...v, slots: newSlots };
+        return updatedTarget;
+      });
+      return {
+        ...prev,
+        visits: updatedVisits,
+      };
+    });
+
+    if (updatedTarget) {
+      persistVisit(updatedTarget);
+    }
   };
 
   const handleAddSlot = (visitId: string) => {
-    setState((prev) => ({
-      ...prev,
-      visits: prev.visits.map((v) => {
+    let updatedTarget: VisitItem | undefined;
+    setState((prev) => {
+      const updatedVisits = prev.visits.map((v) => {
         if (v.id !== visitId) return v;
-        return { ...v, slots: [...v.slots, ''] };
-      }),
-    }));
+        updatedTarget = { ...v, slots: [...v.slots, ''] };
+        return updatedTarget;
+      });
+      return {
+        ...prev,
+        visits: updatedVisits,
+      };
+    });
+
+    if (updatedTarget) {
+      persistVisit(updatedTarget);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#123C6B] text-[#1E2A3F] font-sans py-4 sm:py-10 px-2.5 sm:px-6">
       {/* Barra de Ações Superior */}
-      <div className="max-w-[840px] mx-auto mb-3 flex items-center justify-end px-1">
+      <div className="max-w-[840px] mx-auto mb-3 flex items-center justify-between px-1 flex-wrap gap-2">
+        {/* Status de Sincronização com Supabase */}
+        <div className="flex items-center gap-2">
+          {syncStatus === 'connected' && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setConfigModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all cursor-pointer shadow-xs"
+                title="Supabase Conectado - Clique para ver configurações"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Nuvem Conectada</span>
+              </button>
+              <button
+                type="button"
+                onClick={syncFromSupabase}
+                className="p-1.5 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Recarregar dados da nuvem agora"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {syncStatus === 'syncing' && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-amber-400/20 text-amber-200 border border-amber-400/40 shadow-xs">
+              <RefreshCw className="w-3 h-3 animate-spin text-amber-300" />
+              <span>Salvando na nuvem...</span>
+            </div>
+          )}
+
+          {syncStatus === 'error' && (
+            <button
+              type="button"
+              onClick={() => setConfigModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-red-500/20 text-red-200 border border-red-400/40 hover:bg-red-500/30 transition-all cursor-pointer shadow-xs"
+              title="Erro ao sincronizar. Clique para verificar as chaves"
+            >
+              <span className="w-2 h-2 rounded-full bg-red-400"></span>
+              <span>Erro na Nuvem</span>
+            </button>
+          )}
+
+          {(syncStatus === 'offline' || syncStatus === 'idle') && (
+            <button
+              type="button"
+              onClick={() => setConfigModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-mono font-medium bg-white/10 hover:bg-white/20 text-white/80 border border-white/20 transition-all cursor-pointer shadow-xs"
+              title="Conectar com o Supabase"
+            >
+              <Database className="w-3.5 h-3.5 text-[#E4C687]" />
+              <span>Conectar Nuvem</span>
+            </button>
+          )}
+        </div>
+
         <button
           onClick={toggleEdit}
           id="editBtn"
@@ -558,7 +762,18 @@ export default function App() {
         onSaveSummary={handleSaveVisitSummary}
         visit={summaryVisit}
       />
+
+      {/* Modal de Configuração do Supabase */}
+      <SupabaseConfigModal
+        isOpen={configModalOpen}
+        onClose={() => setConfigModalOpen(false)}
+        onSaveConfig={(url, key) => {
+          saveSupabaseConfig(url, key);
+          syncFromSupabase();
+        }}
+        currentUrl={getSupabaseConfig().url}
+        currentKey={getSupabaseConfig().key}
+      />
     </div>
   );
 }
-
