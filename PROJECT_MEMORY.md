@@ -74,6 +74,6 @@ git push origin main
 
 ## ⏰ Diretriz Permanente do Agendador de Tarefas do Assistente
 - **Autonomia Total:** Sempre que qualquer tarefa for agendada pelo assistente no projeto, ela deve ser configurada e executada de forma **100% autônoma**, sem requerer intervenção manual, confirmação ou cliques do usuário.
-- **Horário e Formato Definidos:** A execução deve ocorrer rigorosamente no horário programado (ex: diariamente às 08:00) e obedecer ao escopo acordado: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados, 4. Locais Agendados (local, data/horário e visitantes agendados), 5. Status dos Resumos.
-- **Persistência de Histórico:** Resultados automáticos devem ser reportados diretamente e gravados nos registros locais (`RELATORIO_VISITAS.md` e logs).
-- **Disparo de E-mail Diário:** Envio automático do relatório em HTML diagramado para `henrique.rosa@poli.ufrj.br` via Resend API (`RESEND_API_KEY`), tanto via execução local quanto via GitHub Actions na nuvem.
+- **Horário e Formato Definidos:** A execução ocorre periodicamente: **Segundas-feiras às 08:00** e **Sextas-feiras às 20:00** (horário de Brasília) via GitHub Actions, com o escopo completo: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados (unificados), 4. Locais Agendados (apenas agendados com dia/hora), 5. Status dos Resumos.
+- **Persistência de Histórico:** Resultados automáticos são gravados em `RELATORIO_VISITAS.md`.
+- **Disparo em Tempo Real pelo Supabase:** A inclusão e desmarcação de voluntários dispara e-mails imediatamente via Trigger SQL no Supabase. O relatório geral completo é disparado pelo GitHub Actions nas segundas às 08:00 e sextas às 20:00.

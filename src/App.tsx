@@ -194,6 +194,17 @@ export default function App() {
   };
 
   const handleSaveModalVisit = (visit: VisitItem) => {
+    const existing = state.visits.find((v) => v.id === visit.id);
+    const prevSlots = existing ? existing.slots.map((s) => (s || '').trim()) : [];
+
+    // Checar se novos voluntários foram preenchidos nesta edição
+    visit.slots.forEach((s, idx) => {
+      const trimmed = (s || '').trim();
+      if (trimmed.length >= 2 && !prevSlots.includes(trimmed)) {
+        notifyVolunteerScheduling(trimmed, visit, idx);
+      }
+    });
+
     setState((prev) => {
       const exists = prev.visits.some((v) => v.id === visit.id);
       let updated: VisitItem[];

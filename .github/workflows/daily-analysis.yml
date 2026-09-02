@@ -1,10 +1,12 @@
-name: Análise Diária de Visitas AA
+name: Relatório Periódico de Visitas AA
 
 on:
   schedule:
-    # Executa todos os dias às 08:00 (horário de Brasília = 11:00 UTC)
-    - cron: '0 11 * * *'
-  workflow_dispatch: # Permite rodar manualmente com 1 clique no GitHub
+    # Segundas-feiras às 08:00 (horário de Brasília = 11:00 UTC)
+    - cron: '0 11 * * 1'
+    # Sextas-feiras às 20:00 (horário de Brasília = 23:00 UTC)
+    - cron: '0 23 * * 5'
+  workflow_dispatch: # Permite rodar manualmente com 1 clique no painel do GitHub
 
 jobs:
   analyze:
