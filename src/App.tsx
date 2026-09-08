@@ -87,6 +87,18 @@ export default function App() {
 
   // Debounce timers para digitação de voluntários
   const debounceTimers = useRef<{ [key: string]: any }>({});
+  // Referência com os dados mais recentes de cada visita para evitar stale closure ao salvar/flush
+  const pendingVisitsRef = useRef<{ [visitId: string]: VisitItem }>({});
+
+  // Toast de feedback visual após salvar
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((curr) => (curr === msg ? null : curr));
+    }, 3500);
+  };
 
   // Salvar no LocalStorage como cache offline de segurança
   useEffect(() => {
@@ -146,14 +158,22 @@ export default function App() {
   useEffect(() => {
     syncFromSupabase();
 
-    // Ouvir alterações em tempo real de outros usuários
+    // Ouvir alterações em tempo real de outros usuários sem sobrescrever edições em andamento
     const unsubscribe = subscribeToVisitsChanges(async () => {
       const updated = await fetchVisitsFromSupabase();
       if (updated && updated.length > 0) {
-        setState((prev) => ({
-          ...prev,
-          visits: sortVisitsAscending(updated),
-        }));
+        setState((prev) => {
+          const merged = updated.map((remoteV) => {
+            if (pendingVisitsRef.current[remoteV.id]) {
+              return pendingVisitsRef.current[remoteV.id];
+            }
+            return remoteV;
+          });
+          return {
+            ...prev,
+            visits: sortVisitsAscending(merged),
+          };
+        });
       }
     });
 
@@ -170,11 +190,27 @@ export default function App() {
     setSyncStatus('syncing');
     const success = await upsertVisitToSupabase(visit);
     setSyncStatus(success ? 'connected' : 'error');
+    if (success) {
+      delete pendingVisitsRef.current[visit.id];
+    }
   };
 
   const sortedVisits = sortVisitsAscending(state.visits);
 
   const toggleEdit = () => {
+    if (isEditing) {
+      // Ao sair do modo de edição (clicar no botão "💾 Salvar"):
+      // 1. Limpar timers de digitação pendentes
+      Object.keys(debounceTimers.current).forEach((key) => {
+        clearTimeout(debounceTimers.current[key]);
+        delete debounceTimers.current[key];
+      });
+      // 2. Persistir imediatamente na nuvem todas as visitas da agenda
+      if (state.visits && state.visits.length > 0) {
+        bulkUpsertVisits(state.visits);
+      }
+      showToast('✅ Alterações da agenda salvas com sucesso!');
+    }
     setIsEditing((prev) => !prev);
   };
 
@@ -194,17 +230,7 @@ export default function App() {
   };
 
   const handleSaveModalVisit = (visit: VisitItem) => {
-    const existing = state.visits.find((v) => v.id === visit.id);
-    const prevSlots = existing ? existing.slots.map((s) => (s || '').trim()) : [];
-
-    // Checar se novos voluntários foram preenchidos nesta edição
-    visit.slots.forEach((s, idx) => {
-      const trimmed = (s || '').trim();
-      if (trimmed.length >= 2 && !prevSlots.includes(trimmed)) {
-        notifyVolunteerScheduling(trimmed, visit, idx);
-      }
-    });
-
+    pendingVisitsRef.current[visit.id] = visit;
     setState((prev) => {
       const exists = prev.visits.some((v) => v.id === visit.id);
       let updated: VisitItem[];
@@ -219,8 +245,9 @@ export default function App() {
       };
     });
 
-    // Gravar no Supabase
+    // Gravar no Supabase (o trigger PostgreSQL envia e-mails se houver novos voluntários)
     persistVisit(visit);
+    showToast('✅ Dados do local e voluntários salvos com sucesso!');
   };
 
   const handleSaveVisitSummary = (
@@ -251,7 +278,9 @@ export default function App() {
     });
 
     if (updatedTarget) {
+      pendingVisitsRef.current[visitId] = updatedTarget;
       persistVisit(updatedTarget);
+      showToast('✅ Resumo da visita registrado com sucesso!');
     }
   };
 
@@ -330,13 +359,27 @@ export default function App() {
 
     // Salvar com debounce de 600ms para aguardar término da digitação
     if (updatedTarget) {
+      pendingVisitsRef.current[visitId] = updatedTarget;
       if (debounceTimers.current[visitId]) {
         clearTimeout(debounceTimers.current[visitId]);
       }
       const targetToSave = { ...updatedTarget };
       debounceTimers.current[visitId] = setTimeout(() => {
         persistVisit(targetToSave);
+        delete pendingVisitsRef.current[visitId];
       }, 600);
+    }
+  };
+
+  const handleFlushSlot = (visitId: string) => {
+    if (debounceTimers.current[visitId]) {
+      clearTimeout(debounceTimers.current[visitId]);
+      delete debounceTimers.current[visitId];
+    }
+    const target = pendingVisitsRef.current[visitId] || state.visits.find((v) => v.id === visitId);
+    if (target) {
+      delete pendingVisitsRef.current[visitId];
+      persistVisit(target);
     }
   };
 
@@ -356,27 +399,24 @@ export default function App() {
     });
 
     if (updatedTarget) {
+      pendingVisitsRef.current[visitId] = updatedTarget;
       persistVisit(updatedTarget);
     }
   };
 
   const handleAddSlot = (visitId: string) => {
-    let updatedTarget: VisitItem | undefined;
     setState((prev) => {
       const updatedVisits = prev.visits.map((v) => {
         if (v.id !== visitId) return v;
-        updatedTarget = { ...v, slots: [...v.slots, ''] };
-        return updatedTarget;
+        const target = { ...v, slots: [...v.slots, ''] };
+        pendingVisitsRef.current[visitId] = target;
+        return target;
       });
       return {
         ...prev,
         visits: updatedVisits,
       };
     });
-
-    if (updatedTarget) {
-      persistVisit(updatedTarget);
-    }
   };
 
   return (
@@ -685,6 +725,12 @@ export default function App() {
                             value={name}
                             placeholder="vaga aberta"
                             onChange={(e) => handleSlotChange(visit.id, ni, e.target.value)}
+                            onBlur={() => handleFlushSlot(visit.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur();
+                              }
+                            }}
                             className={`bg-transparent outline-none w-[105px] sm:w-[130px] text-xs ${
                               isOpen ? 'placeholder:text-[#B23A2E] placeholder:italic text-[#B23A2E]' : 'text-[#3E6B5C] font-medium'
                             }`}
@@ -781,6 +827,14 @@ export default function App() {
         onSaveSummary={handleSaveVisitSummary}
         visit={summaryVisit}
       />
+
+      {/* Notificação Toast Flutuante de Confirmação */}
+      {toastMessage && (
+        <div className="fixed bottom-5 right-5 z-50 bg-[#123C6B] text-white px-4 py-3 rounded-lg shadow-2xl border border-[#E4C687]/50 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <CheckCircle2 className="w-5 h-5 text-[#E4C687] flex-shrink-0" />
+          <span className="font-mono text-xs font-semibold">{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

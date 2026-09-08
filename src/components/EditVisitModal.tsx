@@ -108,8 +108,13 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    onSave(newVisit);
-    onClose();
+    try {
+      onSave(newVisit);
+      onClose();
+    } catch (err: any) {
+      console.error('Erro ao salvar local de visita:', err);
+      setError('Erro ao salvar dados: ' + (err?.message || 'Tente novamente.'));
+    }
   };
 
   return (

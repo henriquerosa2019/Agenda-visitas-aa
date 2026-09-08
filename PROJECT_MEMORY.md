@@ -74,9 +74,9 @@ git push origin main
 
 ## ⏰ Diretriz Permanente do Agendador de Tarefas do Assistente
 - **Autonomia Total:** Sempre que qualquer tarefa for agendada pelo assistente no projeto, ela deve ser configurada e executada de forma **100% autônoma**, sem requerer intervenção manual, confirmação ou cliques do usuário.
-- **Horário e Formato Definidos:** A execução ocorre periodicamente: **Segundas-feiras às 08:00** e **Sextas-feiras às 20:00** (horário de Brasília) via GitHub Actions, com o escopo completo: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados (unificados), 4. Locais Agendados (apenas agendados com dia/hora), 5. Status dos Resumos.
+- **Horário e Formato Definidos:** A execução ocorre periodicamente: **Todos os dias às 08:00** (horário de Brasília) via GitHub Actions e Agendador de Tarefas do Windows, com o escopo completo: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados (unificados), 4. Locais Agendados (apenas agendados com dia/hora), 5. Status dos Resumos.
 - **Persistência de Histórico:** Resultados automáticos são gravados em `RELATORIO_VISITAS.md`.
-- **Disparo em Tempo Real pelo Supabase:** A inclusão e desmarcação de voluntários dispara e-mails imediatamente via Trigger SQL no Supabase. O relatório geral completo é disparado pelo GitHub Actions nas segundas às 08:00 e sextas às 20:00.
+- **Disparo em Tempo Real pelo Supabase:** A inclusão e desmarcação de voluntários dispara e-mails imediatamente via Trigger SQL no Supabase. O relatório geral completo é disparado diariamente às 08:00 (e sob demanda ao clicar na tarefa).
 
 ---
 
@@ -96,8 +96,8 @@ git push origin main
 
 ### 3. Relatório Periódico Consolidado (GitHub Actions ➔ Brevo API)
 - **Despertador / Cron:** `.github/workflows/daily-analysis.yml`
-  - **Segunda-feira às 08:00 BRT** (`0 11 * * 1`)
-  - **Sexta-feira às 20:00 BRT** (`0 23 * * 5`)
+  - **Todos os dias às 08:00 BRT** (`0 11 * * *`)
+  - **Execução manual sob demanda:** Botão *Run workflow* no GitHub Actions ou clique no Agendador de Tarefas.
 - **Processamento:** `scripts/analyze-visits.mjs`
   - Consulta o Supabase e compila os 5 itens: Resumo Geral, Status das Vagas, Voluntários Agendados (com unificação de grafias como `Marcio.Motta` e `Marcio Motta`), Locais Agendados (apenas instituições com agendamento ativo, contendo Local, Dia, Hora e Nomes) e Status dos Resumos de Visita.
   - Diagrama o e-mail em HTML nas cores oficiais de A.A. e envia via Brevo para Henrique e Danilo.
@@ -108,4 +108,7 @@ git push origin main
 
 ### 5. Integridade do Código do App
 - O código da aplicação em `src/` permanece **100% puro e intacto**: sem lógicas de disparo de e-mail no navegador do cliente, preservando leveza, velocidade e segurança.
+- **Resolução de Bug Crítico de Salvamento:** Foi identificado e removido um resquício da função obsoleta `notifyVolunteerScheduling` em `src/App.tsx:204` que gerava `ReferenceError` ao salvar novos voluntários via modal, impedindo o salvamento e o fechamento do modal. O salvamento agora ocorre de forma atômica e robusta via `persistVisit` e `bulkUpsertVisits`.
+- **Feedback Visual (Toast):** Adicionado componente flutuante de confirmação com mensagens claras ("✅ Alterações da agenda salvas com sucesso!") ao clicar em "💾 Salvar" ou ao salvar dados do local.
+- **Testes Automatizados (Playwright):** Criada suíte completa em `tests/e2e-agenda.spec.ts` com o script de 1 clique `executar-testes-playwright.bat` para verificação de uso contínua.
 
