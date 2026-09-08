@@ -274,31 +274,41 @@ async function sendReportEmail({
       }
 
       if (brevoKey) {
-        const senderEmail = (process.env.BREVO_SENDER_EMAIL || 'henrique.rosa@poli.ufrj.br').trim();
-        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'api-key': brevoKey,
-            'Content-Type': 'application/json',
-            accept: 'application/json',
-          },
-          body: JSON.stringify({
-            sender: { name: 'Agenda de Visitas A.A.', email: senderEmail },
-            to: toEmails.map((email) => ({ email })),
-            subject: `📊 Relatório de Visitas A.A. — ${dateFormatted}`,
-            htmlContent: html,
-          }),
-        });
+        try {
+          const senderEmail = (process.env.BREVO_SENDER_EMAIL || 'henrique.rosa@poli.ufrj.br').trim();
+          const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+              'api-key': brevoKey,
+              'Content-Type': 'application/json',
+              accept: 'application/json',
+            },
+            body: JSON.stringify({
+              sender: { name: 'Agenda de Visitas A.A.', email: senderEmail },
+              to: toEmails.map((email) => ({ email })),
+              subject: `📊 Relatório de Visitas A.A. — ${dateFormatted}`,
+              htmlContent: html,
+            }),
+          });
 
-        const data = await response.json();
-        if (response.ok) {
-          console.log(`✅ E-mail enviado com sucesso via Brevo para ${toEmails.join(', ')}! (MessageId: ${data.messageId})\n`);
-          return;
-        } else {
-          console.error('❌ Resposta do Brevo:', data);
-          return;
+          const data = await response.json();
+          if (response.ok) {
+            console.log(`✅ E-mail enviado com sucesso via Brevo para ${toEmails.join(', ')}! (MessageId: ${data.messageId})\n`);
+            return;
+          } else {
+            console.warn('⚠️ Brevo rejeitou envio (IP não autorizado ou erro):', data?.message || data);
+            console.log('🔄 Acionando contingência imediata com Resend...');
+          }
+        } catch (errBrevo) {
+          console.warn('⚠️ Falha de conexão com Brevo:', errBrevo.message);
+          console.log('🔄 Acionando contingência imediata com Resend...');
         }
-      } else {
+      }
+
+      if (resendKey) {
+        // No sandbox gratuito do Resend, envia para o e-mail do titular verificado
+        const targetRecipients = toEmails.filter((e) => e.includes('henrique.rosa'));
+        const recipients = targetRecipients.length > 0 ? targetRecipients : ['henrique.rosa@poli.ufrj.br'];
         const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -307,7 +317,7 @@ async function sendReportEmail({
           },
           body: JSON.stringify({
             from: 'Agenda AA <onboarding@resend.dev>',
-            to: toEmails,
+            to: recipients,
             subject: `📊 Relatório de Visitas A.A. — ${dateFormatted}`,
             html: html,
           }),
@@ -315,11 +325,10 @@ async function sendReportEmail({
 
         const data = await response.json();
         if (response.ok) {
-          console.log(`✅ E-mail enviado com sucesso via Resend para ${toEmails.join(', ')}! (ID: ${data.id})\n`);
+          console.log(`✅ E-mail enviado com sucesso via Resend (Contingência) para ${recipients.join(', ')}! (ID: ${data.id})\n`);
           return;
         } else {
           console.error('❌ Resposta do Resend:', data);
-          return;
         }
       }
     } catch (err) {
