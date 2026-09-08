@@ -1,4 +1,4 @@
-const CACHE_NAME = 'aa-agenda-cache-v1';
+const CACHE_NAME = 'aa-agenda-cache-v2';
 const PRECACHE = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (event) => {

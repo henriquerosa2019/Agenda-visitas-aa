@@ -34,6 +34,7 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
   const [slots, setSlots] = useState<string[]>(['', '', '']);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     if (initialVisit) {
@@ -99,6 +100,7 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
     }
 
     const newVisit: VisitItem = {
+      ...(initialVisit || {}),
       id: initialVisit ? initialVisit.id : `visit-${Date.now()}`,
       name: name.trim(),
       addr: addr.trim(),
@@ -109,9 +111,14 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
     };
 
     try {
+      setIsSaved(true);
       onSave(newVisit);
-      onClose();
+      setTimeout(() => {
+        setIsSaved(false);
+        onClose();
+      }, 350);
     } catch (err: any) {
+      setIsSaved(false);
       console.error('Erro ao salvar local de visita:', err);
       setError('Erro ao salvar dados: ' + (err?.message || 'Tente novamente.'));
     }
@@ -304,10 +311,15 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded bg-[#123C6B] hover:bg-[#1E5A9C] text-white shadow-md transition-all flex items-center gap-1.5"
+              disabled={isSaved}
+              className={`px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider rounded transition-all flex items-center gap-1.5 shadow-md ${
+                isSaved
+                  ? 'bg-emerald-700 text-white shadow-emerald-900/30'
+                  : 'bg-[#123C6B] hover:bg-[#1E5A9C] text-white cursor-pointer'
+              }`}
             >
-              <Check className="w-4 h-4" />
-              <span>Salvar Local</span>
+              <Check className={`w-4 h-4 ${isSaved ? 'text-white' : 'text-[#E4C687]'}`} />
+              <span>{isSaved ? 'Salvo com Sucesso!' : 'Salvar Local'}</span>
             </button>
           </div>
         </form>

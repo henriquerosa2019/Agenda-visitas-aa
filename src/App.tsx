@@ -97,7 +97,7 @@ export default function App() {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage((curr) => (curr === msg ? null : curr));
-    }, 3500);
+    }, 4500);
   };
 
   // Salvar no LocalStorage como cache offline de segurança
@@ -828,11 +828,33 @@ export default function App() {
         visit={summaryVisit}
       />
 
-      {/* Notificação Toast Flutuante de Confirmação */}
+      {/* Notificação Toast Flutuante de Confirmação em Destaque no Topo */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-[#123C6B] text-white px-4 py-3 rounded-lg shadow-2xl border border-[#E4C687]/50 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-[#E4C687] flex-shrink-0" />
-          <span className="font-mono text-xs font-semibold">{toastMessage}</span>
+        <div
+          role="alert"
+          className="fixed top-5 left-1/2 -translate-x-1/2 z-[99999] w-[92%] max-w-[460px] bg-[#123C6B] text-white px-5 py-3.5 rounded-xl shadow-[0_12px_45px_rgba(0,0,0,0.6)] border-2 border-[#E4C687] flex items-center justify-between gap-3 select-none animate-in fade-in slide-in-from-top-4 duration-200"
+        >
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-mono text-xs sm:text-[13px] font-bold text-[#FBF9F2] leading-snug">
+                {toastMessage}
+              </p>
+              <p className="text-[10.5px] text-[#E4C687] font-mono mt-0.5">
+                Gravado na nuvem e visível para todos
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="text-white/70 hover:text-white text-lg font-bold p-1 rounded-full cursor-pointer leading-none flex-shrink-0"
+            title="Fechar aviso"
+          >
+            ×
+          </button>
         </div>
       )}
     </div>
