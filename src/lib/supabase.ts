@@ -16,6 +16,10 @@ export function normalizeSupabaseUrl(rawUrl: string): string {
   return url;
 }
 
+const DEFAULT_SUPABASE_URL = 'https://pyydnicvltkioovtvzfk.supabase.co';
+const DEFAULT_SUPABASE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5eWRuaWN2bHRraW9vdnR2emZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTUwMzEsImV4cCI6MjA5MDYzMTAzMX0.-_d2zNCPnoNPJBaGnc2JUmq_uj2Xi7FUETQC-ViQ4Ew';
+
 export function getSupabaseConfig(): { url: string; key: string } {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -23,8 +27,8 @@ export function getSupabaseConfig(): { url: string; key: string } {
   const localUrl = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_URL_KEY) || '' : '';
   const localKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_KEY) || '' : '';
 
-  const url = normalizeSupabaseUrl(localUrl || envUrl);
-  const key = (localKey || envKey).trim();
+  const url = normalizeSupabaseUrl(localUrl || envUrl || DEFAULT_SUPABASE_URL);
+  const key = (localKey || envKey || DEFAULT_SUPABASE_KEY).trim();
 
   return { url, key };
 }
