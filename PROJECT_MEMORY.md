@@ -7,8 +7,8 @@ Este documento registra todas as decisões de design, regras de negócio, arquit
 ## 🗂️ Dados e Links do Projeto
 - **Nome do Projeto:** Escala de Visitas AA — Grupo de Serviços CTO/CIT
 - **Repositório GitHub:** [https://github.com/henriquerosa2019/Agenda-visitas-aa](https://github.com/henriquerosa2019/Agenda-visitas-aa)
-- **Site Público no Ar (Netlify):** [https://agenda-visitas-aa.netlify.app](https://agenda-visitas-aa.netlify.app)
-- **Painel de Deploys (Netlify):** [https://app.netlify.com/projects/agenda-visitas-aa/deploys](https://app.netlify.com/projects/agenda-visitas-aa/deploys)
+- **Hospedagem & Deploys:** Vercel (conectado ao GitHub `main`)
+- **Site de Contingência Anterior:** Netlify (`agenda-visitas-aa.netlify.app` - pausado por créditos)
 - **Stack Tecnológica:** 
   - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React (ícones)
   - **PWA:** `manifest.json`, `sw.js` para suporte a app instalável
