@@ -30,6 +30,10 @@ import {
   Plus,
   RefreshCw,
   Database,
+  Smartphone,
+  Download,
+  Share,
+  X,
 } from 'lucide-react';
 
 const CURRENT_STORAGE_KEY = 'escala_visitas_aa_data_v8';
@@ -92,6 +96,52 @@ export default function App() {
 
   // Toast de feedback visual após salvar
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Estados para instalação PWA (ícone na tela do celular)
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState<boolean>(false);
+  const [showInstallGuide, setShowInstallGuide] = useState<boolean>(false);
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Detecta se já está aberto como aplicativo instalado na tela inicial
+    const isApp =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true;
+    setIsStandalone(Boolean(isApp));
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
+    window.addEventListener('appinstalled', () => {
+      setIsStandalone(true);
+      setIsInstallable(false);
+      setDeferredPrompt(null);
+      showToast('Aplicativo instalado com sucesso na sua tela inicial! 🎉');
+    });
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        setIsInstallable(false);
+        setDeferredPrompt(null);
+      }
+    } else {
+      setShowInstallGuide(true);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -483,13 +533,27 @@ export default function App() {
           )}
         </div>
 
-        <button
-          onClick={toggleEdit}
-          id="editBtn"
-          className="font-mono text-xs uppercase tracking-wider font-semibold px-4 py-2 rounded-full border border-[#8A6A38] bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] shadow-md hover:brightness-105 transition-all cursor-pointer"
-        >
-          {isEditing ? '💾 Salvar' : '✎ Editar agenda'}
-        </button>
+        <div className="flex items-center gap-2">
+          {!isStandalone && (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 shadow-xs transition-all cursor-pointer"
+              title="Instalar ícone do aplicativo na tela inicial do celular"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Instalar App</span>
+            </button>
+          )}
+
+          <button
+            onClick={toggleEdit}
+            id="editBtn"
+            className="font-mono text-xs uppercase tracking-wider font-semibold px-4 py-2 rounded-full border border-[#8A6A38] bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] shadow-md hover:brightness-105 transition-all cursor-pointer"
+          >
+            {isEditing ? '💾 Salvar' : '✎ Editar agenda'}
+          </button>
+        </div>
       </div>
 
       {/* Sheet Principal - Folha Timbrada */}
@@ -827,6 +891,74 @@ export default function App() {
         onSaveSummary={handleSaveVisitSummary}
         visit={summaryVisit}
       />
+
+      {/* Modal / Guia de Instalação do App no Celular */}
+      {showInstallGuide && (
+        <div className="fixed inset-0 z-[99999] bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#FBF9F2] text-[#1E2A3F] rounded-2xl max-w-md w-full p-6 shadow-2xl border-2 border-[#E4C687] relative animate-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              onClick={() => setShowInstallGuide(false)}
+              className="absolute top-4 right-4 text-[#1E2A3F]/60 hover:text-[#1E2A3F] p-1.5 rounded-full hover:bg-black/5 transition-colors cursor-pointer"
+              title="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3.5 mb-5 pb-4 border-b border-[#1E2A3F]/10">
+              <img
+                src="/icon-192.png"
+                alt="Ícone Oficial A.A."
+                className="w-14 h-14 rounded-2xl shadow-md border border-[#1E2A3F]/15 flex-shrink-0"
+              />
+              <div>
+                <h3 className="font-serif font-bold text-lg text-[#123C6B]">
+                  Instalar no seu Celular
+                </h3>
+                <p className="text-xs text-[#1E2A3F]/70 font-mono mt-0.5">
+                  Acesse com 1 toque direto da tela inicial
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Instruções para Android */}
+              <div className="bg-[#123C6B]/5 p-3.5 rounded-xl border border-[#123C6B]/10">
+                <div className="font-mono font-bold text-[#123C6B] text-[12.5px] mb-1.5 flex items-center gap-2">
+                  <span>🤖 No Android (Chrome ou Edge):</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-[#1E2A3F]/85 leading-relaxed">
+                  <li>Toque no menu de <strong>três pontinhos (⋮)</strong> no canto superior do navegador.</li>
+                  <li>Selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>.</li>
+                  <li>Confirme e o ícone oficial do A.A. aparecerá na sua tela de trabalho!</li>
+                </ol>
+              </div>
+
+              {/* Instruções para iPhone */}
+              <div className="bg-[#123C6B]/5 p-3.5 rounded-xl border border-[#123C6B]/10">
+                <div className="font-mono font-bold text-[#123C6B] text-[12.5px] mb-1.5 flex items-center gap-2">
+                  <span>🍏 No iPhone (Safari):</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-[#1E2A3F]/85 leading-relaxed">
+                  <li>Toque no botão <strong>Compartilhar</strong> (ícone do quadrado com seta para cima <Share className="inline w-3.5 h-3.5 text-[#123C6B] mx-0.5" /> na barra inferior).</li>
+                  <li>Role a lista para baixo e toque em <strong>"Adicionar à Tela de Início"</strong>.</li>
+                  <li>Toque em <strong>"Adicionar"</strong> no canto superior direito.</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowInstallGuide(false)}
+                className="px-6 py-2.5 rounded-full font-mono font-bold text-xs bg-[#123C6B] text-white hover:bg-[#1E5A9C] shadow-md cursor-pointer transition-colors"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notificação Toast Flutuante de Confirmação em Destaque no Topo */}
       {toastMessage && (
