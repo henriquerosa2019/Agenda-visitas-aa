@@ -11,7 +11,7 @@ export const INITIAL_AGENDA: AgendaData = {
       addr: 'Rua Dr. Pereira dos Santos, N° 18 – Tijuca',
       date: '2026-09-14',
       time: '10:00',
-      slots: ['Danilo', '', ''],
+      slots: ['Danilo', 'Marcio Motta'],
       notes: 'Unidade de internação - Recepção principal',
     },
     {
@@ -20,7 +20,7 @@ export const INITIAL_AGENDA: AgendaData = {
       addr: 'Rua Conde de Bonfim, N° 1030 – Tijuca',
       date: '2026-09-14',
       time: '16:00',
-      slots: ['', '', ''],
+      slots: ['Marcio Motta', '', ''],
       notes: 'Apresentar documento de identificação na portaria',
     },
     {
@@ -47,7 +47,7 @@ export const INITIAL_AGENDA: AgendaData = {
       addr: 'Rua Conde de Bonfim, N° 1030 – Tijuca',
       date: '2026-09-28',
       time: '16:00',
-      slots: [''],
+      slots: ['Marcio Motta', '', 'Roberto'],
       notes: 'Encerramento da escala de visitas de setembro',
     },
   ]),

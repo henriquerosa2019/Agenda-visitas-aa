@@ -13,6 +13,90 @@ test.describe('Agenda de Visitas A.A. — Testes de Utilização e Edição de V
       }
     });
 
+    // Intercepta chamadas do Supabase para NÃO alterar o banco de dados de produção durante os testes
+    await page.route('**/rest/v1/**', async (route) => {
+      const method = route.request().method();
+      if (method === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 'sept-14-10h',
+              name: 'Clínica da Gávea – Unidade Tijuca',
+              addr: 'Rua Dr. Pereira dos Santos, N° 18 – Tijuca',
+              date: '2026-09-14',
+              time: '10:00',
+              slots: ['Danilo', 'Marcio Motta'],
+              notes: 'Unidade de internação - Recepção principal',
+              visit_summary: null,
+              completed_by: null,
+              completed_at: null,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              id: 'sept-14-16h',
+              name: 'Hospital São Francisco na Providência de Deus',
+              addr: 'Rua Conde de Bonfim, N° 1030 – Tijuca',
+              date: '2026-09-14',
+              time: '16:00',
+              slots: ['Marcio Motta', '', ''],
+              notes: 'Apresentar documento de identificação na portaria',
+              visit_summary: null,
+              completed_by: null,
+              completed_at: null,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              id: 'sept-16-19h30',
+              name: 'Hospital Casa Menssana',
+              addr: 'Rua Marechal Jofre, N° 30 – Grajaú',
+              date: '2026-09-16',
+              time: '19:30',
+              slots: ['', '', ''],
+              notes: 'Visita noturna à enfermaria',
+              visit_summary: null,
+              completed_by: null,
+              completed_at: null,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              id: 'sept-21-17h',
+              name: 'Clínica Evolução',
+              addr: 'Rua Mariz e Barros, N° 430 – Praça da Bandeira',
+              date: '2026-09-21',
+              time: '17:00',
+              slots: ['', '', ''],
+              notes: 'Reunião de partilha com pacientes',
+              visit_summary: null,
+              completed_by: null,
+              completed_at: null,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              id: 'sept-28-16h',
+              name: 'Hospital São Francisco na Providência de Deus',
+              addr: 'Rua Conde de Bonfim, N° 1030 – Tijuca',
+              date: '2026-09-28',
+              time: '16:00',
+              slots: ['Marcio Motta', '', 'Roberto'],
+              notes: 'Encerramento da escala de visitas de setembro',
+              visit_summary: null,
+              completed_by: null,
+              completed_at: null,
+              updated_at: new Date().toISOString(),
+            },
+          ]),
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true }),
+        });
+      }
+    });
+
     // Acessa a aplicação local ou em produção
     const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
     await page.goto(baseUrl);
