@@ -7,10 +7,10 @@ Este documento registra todas as decisões de design, regras de negócio, arquit
 ## 🗂️ Dados e Links do Projeto
 - **Nome do Projeto:** Escala de Visitas AA — Grupo de Serviços CTO/CIT
 - **Repositório GitHub:** [https://github.com/henriquerosa2019/Agenda-visitas-aa](https://github.com/henriquerosa2019/Agenda-visitas-aa)
-- **Hospedagem & Deploys:** Vercel (conectado ao GitHub `main`)
-- **Site de Contingência Anterior:** Netlify (`agenda-visitas-aa.netlify.app` - pausado por créditos)
+- **Hospedagem & Deploys Oficial:** Vercel — [https://agenda-visitas-aa.vercel.app](https://agenda-visitas-aa.vercel.app) (conectado automaticamente ao GitHub `main`)
+- **Site Anterior Descontinuado:** Netlify (`agenda-visitas-aa.netlify.app` - pausado)
 - **Stack Tecnológica:** 
-  - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React (ícones)
+  - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React (ícones), Vercel Analytics
   - **PWA:** `manifest.json`, `sw.js` para suporte a app instalável
   - **Persistência & Sincronização em Nuvem:** Supabase (`aa_visits`) com Postgres Realtime e cache local de contingência (`localStorage` `escala_visitas_aa_data_v8`).
   - **Credenciais Supabase:** Configuração via variáveis de ambiente (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) ou via interface com modal de configuração (`SupabaseConfigModal`).
@@ -64,7 +64,7 @@ npm run analyze
 # Gerar build de produção
 npm run build
 
-# Enviar atualizações para o GitHub (que dispara o deploy no Netlify)
+# Enviar atualizações para o GitHub (que dispara o deploy contínuo na Vercel)
 git add .
 git commit -m "Descrição da alteração"
 git push origin main
@@ -77,6 +77,7 @@ git push origin main
 - **Horário e Formato Definidos:** A execução ocorre periodicamente: **Todos os dias às 08:00** (horário de Brasília) via GitHub Actions e Agendador de Tarefas do Windows, com o escopo completo: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados (unificados), 4. Locais Agendados (apenas agendados com dia/hora), 5. Status dos Resumos.
 - **Persistência de Histórico:** Resultados automáticos são gravados em `RELATORIO_VISITAS.md`.
 - **Disparo em Tempo Real pelo Supabase:** A inclusão e desmarcação de voluntários dispara e-mails imediatamente via Trigger SQL no Supabase. O relatório geral completo é disparado diariamente às 08:00 (e sob demanda ao clicar na tarefa).
+- **Prevenção de Inatividade do Supabase:** A execução diária do cron do GitHub Actions às 08:00 faz uma leitura no Supabase que mantém o projeto ativo, evitando que ele pause por inatividade no plano Free.
 
 ---
 
@@ -88,23 +89,30 @@ git push origin main
 
 ### 2. Notificações em Tempo Real (Supabase ➔ Brevo API)
 - **Gatilho no Banco:** Trigger PostgreSQL `on_volunteer_change` na tabela `public.aa_visits` (executa a função `public.tr_notify_volunteer_changes()`).
-- **Extensão Utilizada:** `pg_net` executando chamadas HTTP assíncronas para a API REST v3 do Brevo (`https://api.brevo.com/v3/smtp/email`).
+- **Extensão Utilizada:** `pg_net` executando chamadas HTTP assíncronas no schema `net` (`net.http_post`) para a API REST v3 do Brevo (`https://api.brevo.com/v3/smtp/email`).
 - **Cenários Cobertos:**
   1. **Novo Voluntário Cadastrado:** Detecta novos nomes inseridos nas vagas e envia e-mail comemorativo/informativo com presença confirmada.
   2. **Voluntário Retirou o Nome:** Detecta nomes apagados/removidos e envia e-mail de atenção informando a desistência e que a vaga reabriu.
-- **Remetente Autorizado:** `henrique.rosa@poli.ufrj.br` (exibido como *"Agenda de Visitas A.A."*, agora **Verificado** no Brevo).
+- **Remetente Autorizado:** `henrique.rosa@poli.ufrj.br` (exibido como *"Agenda de Visitas A.A."*, Verificado no Brevo).
+- **Regra de Ouro no Brevo (IPs Autorizados):**
+  - **IMPORTANTE:** A opção de segurança *"Bloquear endereços IP não autorizados para Chaves API"* em `https://app.brevo.com/security/authorised_ips` **DEVE PERMANECER DESATIVADA**.
+  - **Motivo:** O Supabase roda na nuvem da AWS com IPs dinâmicos (ex: IPv6 `2600:1f16:...`). Se a trava de IP estiver ligada, o Brevo rejeita as chamadas do banco com `status_code: 401 (unauthorized)`. Com a trava desativada, o Brevo aceita as requisições autenticadas exclusivamente pela chave secreta da API com `status_code: 200/201`.
+- **Auditoria Técnica do Disparo:** As respostas HTTP de cada disparo do gatilho ficam registradas no banco e podem ser consultadas no SQL Editor via:
+  ```sql
+  select id, status_code, content, created from net._http_response order by created desc limit 5;
+  ```
 
 ### 3. Relatório Periódico Consolidado (GitHub Actions ➔ Brevo API)
 - **Despertador / Cron:** `.github/workflows/daily-analysis.yml`
   - **Todos os dias às 08:00 BRT** (`0 11 * * *`)
-  - **Execução manual sob demanda:** Botão *Run workflow* no GitHub Actions ou clique no Agendador de Tarefas.
+  - **Execução manual sob demanda:** Botão *Run workflow* no GitHub Actions ou clique duplo no arquivo `executar-analise-agora.bat` na raiz do projeto.
 - **Processamento:** `scripts/analyze-visits.mjs`
   - Consulta o Supabase e compila os 5 itens: Resumo Geral, Status das Vagas, Voluntários Agendados (com unificação de grafias como `Marcio.Motta` e `Marcio Motta`), Locais Agendados (apenas instituições com agendamento ativo, contendo Local, Dia, Hora e Nomes) e Status dos Resumos de Visita.
   - Diagrama o e-mail em HTML nas cores oficiais de A.A. e envia via Brevo para Henrique e Danilo.
 
 ### 4. Resolução de Rede & IP Dinâmico
 - **Forçar IPv4:** Configurado `--dns-result-order=ipv4first` no script `analyze` do `package.json` e no arquivo batch `scripts/run-daily-analysis.bat` para garantir conectividade direta via IPv4 homologado no Brevo.
-- **Retentativas Automáticas:** O script `scripts/analyze-visits.mjs` possui retry automático (até 3 tentativas) para tolerar oscilações momentâneas de conexão.
+- **Retentativas Automáticas & Fallback:** O script `scripts/analyze-visits.mjs` possui retry automático (até 3 tentativas) e chave de contingência automática para o **Resend** caso o Brevo oscile.
 
 ### 5. Integridade do Código do App
 - O código da aplicação em `src/` permanece **100% puro e intacto**: sem lógicas de disparo de e-mail no navegador do cliente, preservando leveza, velocidade e segurança.
