@@ -121,3 +121,39 @@ git push origin main
 - **Feedback Visual (Toast):** Adicionado componente flutuante de confirmação com mensagens claras ("✅ Alterações da agenda salvas com sucesso!") ao clicar em "💾 Salvar" ou ao salvar dados do local.
 - **Testes Automatizados (Playwright):** Criada suíte completa em `tests/e2e-agenda.spec.ts` com o script de 1 clique `executar-testes-playwright.bat` para verificação de uso contínua.
 
+---
+
+## 🛡️ Integridade de Dados, Anti-Duplicidade & Arquitetura de Sincronização
+
+### 1. Regra de Unicidade e Anti-Duplicidade de Voluntários
+- **Princípio:** Um voluntário **não pode ser escalado mais de uma vez para o mesmo local na mesma data**, mesmo que em horários ou vagas diferentes da mesma instituição.
+- **Normalização Inteligente (`src/lib/validation.ts`):** 
+  - Comparações insensíveis a maiúsculas/minúsculas, múltiplos espaços, acentuações e caracteres separadores (pontos, hifens). Ex: `Roberto`, `roberto`, `ROBERTO `, `Roberto.` e `Márcio Motta` / `Marcio.Motta` são detectados como o mesmo voluntário.
+  - Vagas abertas (`""`) são ignoradas pela validação, permitindo qualquer quantidade de vagas abertas.
+- **Validação na Digitação em Tempo Real (`src/App.tsx`):**
+  - Ao digitar e perder o foco (`onBlur` / `Enter`), se o nome for duplicado no mesmo local e dia, o sistema:
+    1. Emite alerta flutuante (*Toast*): `"⚠️ O voluntário '[Nome]' já está escalado para este local nesta data! Não é permitido duplicidade."`
+    2. Reseta a vaga em questão para vazia (`""` - vaga aberta).
+    3. Persiste o estado sanitizado.
+  - No debounce de digitação (600ms): verifica duplicidade antes de disparar o salvamento em segundo plano para o Supabase.
+- **Validação no Modal de Edição (`src/components/EditVisitModal.tsx`):**
+  - O formulário bloqueia a submissão com aviso de erro em destaque caso haja nomes repetidos entre as vagas.
+- **Deduplicação Defensiva nos Relatórios (`scripts/analyze-visits.mjs`):**
+  - A contagem de voluntários e vagas preenchidas, assim como a listagem por instituição no e-mail e no `RELATORIO_VISITAS.md`, aplicam deduplicação defensiva via `getConfirmedVolunteers()`.
+
+### 2. Arquitetura de Sincronização (Nuvem vs. Cache Local)
+- **Autoridade Central do Supabase:**
+  - O banco de dados Supabase é a **única fonte da verdade** para as visitas existentes na escala.
+  - **Eliminação do "Efeito Bumerangue" de Cache:**
+    - No passado, a função `mergeLocalAndRemoteVisits` preenchia slots remotos vazios com valores legados do `localStorage` do aparelho e disparava `bulkUpsertVisits` automaticamente durante a inicialização (`syncFromSupabase`). Isso causava a "ressurreição" de voluntários deletados ou duplicados sempre que um aparelho com cache antigo abria o app.
+    - **Regra Definitiva:** `syncFromSupabase()` atua **estritamente como leitura**. Ao abrir a página, ele baixa os dados da nuvem, sanitiza duplicatas e renderiza na tela. **Jamais reenvia dados automaticamente para o banco na carga inicial**.
+    - `mergeLocalAndRemoteVisits` preserva a prioridade absoluta dos slots do Supabase. Apenas novos locais criados 100% offline no aparelho são enviados para a nuvem.
+- **Controle de Versão de Cache (`v9`) e PWA (`v3`):**
+  - A chave de contingência do navegador foi promovida para `escala_visitas_aa_data_v9`, e todas as chaves obsoletas (`v8`, `v7`, `v6`, `v5`) são deletadas do `localStorage` na inicialização do app.
+  - O Service Worker PWA foi promovido para `aa-agenda-cache-v3` e configurado com `reg.update()` em `src/main.tsx` para forçar a atualização imediata do código nos dispositivos móveis dos voluntários.
+
+### 3. Histórico do Caso "Roberto" (28/09 às 16h - Hospital São Francisco)
+- **Origem:** No commit `7f7deb4`, o arquivo `initialData.ts` continha `['Marcio Motta', '', 'Roberto']` (vaga 2 aberta). Um usuário digitou "Roberto" na vaga aberta 2. Devido à ausência de validação na época, o banco salvou `["Marcio Motta", "Roberto", "Roberto"]`.
+- **Resolução:** O banco Supabase foi corrigido para `["Marcio Motta", "Roberto", ""]` (com a 3ª vaga aberta), a suíte de testes unitários foi adicionada em `tests/validation.test.mjs`, o relatório diário foi recalculado para 1 visita confirmada de Roberto e o deploy foi homologado e publicado na Vercel.
+
+
