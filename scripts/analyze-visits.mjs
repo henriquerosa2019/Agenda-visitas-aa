@@ -42,6 +42,22 @@ function formatVolunteerDisplayName(name) {
     .join(' ');
 }
 
+function getConfirmedVolunteers(slots) {
+  const rawSlots = Array.isArray(slots) ? slots : [];
+  const confirmados = [];
+  const seen = new Set();
+  for (const s of rawSlots) {
+    const trimmed = (s || '').trim();
+    if (!trimmed) continue;
+    const key = normalizeVolunteerKey(trimmed);
+    if (!seen.has(key)) {
+      seen.add(key);
+      confirmados.push(formatVolunteerDisplayName(trimmed));
+    }
+  }
+  return confirmados;
+}
+
 const supabaseUrl = normalizeUrl(process.env.VITE_SUPABASE_URL);
 const supabaseKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
@@ -105,10 +121,7 @@ async function sendReportEmail({
   const locaisAgendadosHtml = visitasComVoluntarios.length
     ? visitasComVoluntarios
         .map((v) => {
-          const slots = Array.isArray(v.slots) ? v.slots : [];
-          const confirmados = slots
-            .filter((s) => (s || '').trim())
-            .map((s) => formatVolunteerDisplayName(s));
+          const confirmados = getConfirmedVolunteers(v.slots);
 
           return `
             <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px;">
@@ -243,7 +256,7 @@ async function sendReportEmail({
 
       <!-- Botão de Ação -->
       <div style="text-align: center; margin-top: 28px; padding-top: 18px; border-top: 1px solid #E2E8F0;">
-        <a href="https://agenda-visitas-aa.netlify.app" target="_blank" style="display: inline-block; background-color: #123C6B; color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
+        <a href="https://agenda-visitas-aa.vercel.app" target="_blank" style="display: inline-block; background-color: #123C6B; color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 2px 5px rgba(0,0,0,0.15);">
           🔗 Acessar Agenda de Visitas Online
         </a>
       </div>
@@ -386,23 +399,29 @@ export async function runVisitsAnalysis() {
   const visitasComResumo = [];
 
   for (const v of visits) {
-    const slots = Array.isArray(v.slots) ? v.slots : [];
-    totalVagasOfertadas += slots.length;
+    const rawSlots = Array.isArray(v.slots) ? v.slots : [];
+    totalVagasOfertadas += rawSlots.length;
 
-    for (const rawName of slots) {
+    const seenInVisit = new Set();
+    for (const rawName of rawSlots) {
       const trimmed = (rawName || '').trim();
       if (trimmed) {
-        totalVagasPreenchidas++;
         const key = normalizeVolunteerKey(trimmed);
-        const displayName = formatVolunteerDisplayName(trimmed);
+        if (!seenInVisit.has(key)) {
+          seenInVisit.add(key);
+          totalVagasPreenchidas++;
+          const displayName = formatVolunteerDisplayName(trimmed);
 
-        if (!voluntarioAgg[key]) {
-          voluntarioAgg[key] = {
-            name: displayName,
-            count: 0,
-          };
+          if (!voluntarioAgg[key]) {
+            voluntarioAgg[key] = {
+              name: displayName,
+              count: 0,
+            };
+          }
+          voluntarioAgg[key].count += 1;
+        } else {
+          totalVagasAbertas++;
         }
-        voluntarioAgg[key].count += 1;
       } else {
         totalVagasAbertas++;
       }
@@ -463,10 +482,7 @@ export async function runVisitsAnalysis() {
     console.log(`   (Nenhum local com agendamento confirmado no momento)`);
   } else {
     visitasComVoluntarios.forEach((v, idx) => {
-      const slots = Array.isArray(v.slots) ? v.slots : [];
-      const confirmados = slots
-        .filter((s) => (s || '').trim())
-        .map((s) => formatVolunteerDisplayName(s));
+      const confirmados = getConfirmedVolunteers(v.slots);
 
       console.log(`   ${idx + 1}. Local: ${v.name}`);
       console.log(`      Dia: ${formatBrDate(v.date)}             Hora: ${v.time}`);
@@ -522,10 +538,7 @@ ${
   visitasComVoluntarios.length
     ? visitasComVoluntarios
         .map((v) => {
-          const slots = Array.isArray(v.slots) ? v.slots : [];
-          const confirmados = slots
-            .filter((s) => (s || '').trim())
-            .map((s) => formatVolunteerDisplayName(s));
+          const confirmados = getConfirmedVolunteers(v.slots);
           return `- **Local:** ${v.name}\n  - **Dia:** ${formatBrDate(v.date)} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Hora:** ${v.time}\n  - **Voluntários:** ${confirmados.join(', ')}`;
         })
         .join('\n\n')

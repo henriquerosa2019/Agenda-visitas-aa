@@ -38,6 +38,7 @@ Este documento registra todas as decisões de design, regras de negócio, arquit
 - **Vaga Aberta:** Pílula com fundo vermelho/rosa suave (`#F4E2DE`), borda tracejada e texto *"vaga aberta"*.
 - **Vaga Preenchida:** Pílula com fundo verde suave (`#DEE9E2`) e nome do companheiro voluntário.
 - **Flexibilidade:** Botão `+ vaga` permite adicionar novas vagas dinamicamente para cada instituição.
+- **Regra de Unicidade (Anti-Duplicidade):** Não é permitido o lançamento do mesmo voluntário (comparações normalizadas insensíveis a maiúsculas, espaços e acentos) para o mesmo local na mesma data. Tentativas de preenchimento duplicado são bloqueadas com alerta visual (Toast / Erro no Modal) e a vaga permanece aberta, garantindo integridade dos dados e relatórios diários precisos.
 
 ### 5. Barra Superior e Ações
 - Botão alinhado à direita com degradê dourado: **`✎ Editar agenda`** / **`💾 Salvar`**.

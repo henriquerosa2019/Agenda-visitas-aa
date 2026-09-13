@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { VisitItem } from '../types';
+import { sanitizeSlots } from './validation';
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -67,7 +68,7 @@ export function mapVisitToRow(v: VisitItem) {
     addr: v.addr,
     date: v.date,
     time: v.time,
-    slots: Array.isArray(v.slots) ? v.slots : [],
+    slots: sanitizeSlots(Array.isArray(v.slots) ? v.slots : []),
     notes: v.notes || null,
     visit_summary: v.visitSummary || null,
     completed_by: v.completedBy || null,
@@ -102,67 +103,42 @@ export function mergeLocalAndRemoteVisits(
 
   const result: VisitItem[] = [];
 
-  // Percorrer as visitas remotas e mesclar preenchimentos locais existentes
+  // O banco de dados Supabase é a autoridade central para visitas existentes
   for (const remote of remoteVisits) {
     const local = localVisits.find((v) => v.id === remote.id);
-    if (!local) {
-      result.push(remote);
-      continue;
-    }
+    const cleanSlots = sanitizeSlots(Array.isArray(remote.slots) ? remote.slots : []);
 
-    // Mesclar slots: se o remoto tem vaga aberta (""), mas o local tem voluntário gravado, preserva o voluntário!
-    const maxSlots = Math.max(remote.slots.length, local.slots.length);
-    const mergedSlots: string[] = [];
-    let slotsChanged = false;
+    let summary = remote.visitSummary;
+    let completedAt = remote.completedAt;
+    let completedBy = remote.completedBy;
+    let isCompleted = remote.isCompleted;
 
-    for (let i = 0; i < maxSlots; i++) {
-      const remName = (remote.slots[i] || '').trim();
-      const locName = (local.slots[i] || '').trim();
-
-      if (!remName && locName) {
-        // Local preencheu a vaga e remoto ainda estava em branco
-        mergedSlots.push(locName);
-        slotsChanged = true;
-      } else if (remName) {
-        // Remoto tem o nome
-        mergedSlots.push(remName);
-      } else {
-        mergedSlots.push('');
-      }
-    }
-
-    // Mesclar resumo da visita caso exista no aparelho e ainda não no banco
-    let mergedSummary = remote.visitSummary;
-    let mergedCompletedAt = remote.completedAt;
-    let mergedCompletedBy = remote.completedBy;
-    let mergedIsCompleted = remote.isCompleted;
-
-    if (!remote.visitSummary && local.visitSummary) {
-      mergedSummary = local.visitSummary;
-      mergedCompletedAt = local.completedAt || new Date().toISOString();
-      mergedCompletedBy = local.completedBy;
-      mergedIsCompleted = local.isCompleted;
-      slotsChanged = true;
-    }
-
-    if (slotsChanged) {
+    // Preserva resumo da visita apenas se cadastrado localmente e ainda não persistido
+    if (local && !remote.visitSummary && local.visitSummary) {
+      summary = local.visitSummary;
+      completedAt = local.completedAt || new Date().toISOString();
+      completedBy = local.completedBy;
+      isCompleted = local.isCompleted;
       hasLocalChanges = true;
     }
 
     result.push({
       ...remote,
-      slots: mergedSlots,
-      visitSummary: mergedSummary,
-      completedAt: mergedCompletedAt,
-      completedBy: mergedCompletedBy,
-      isCompleted: mergedIsCompleted || Boolean(mergedSummary),
+      slots: cleanSlots,
+      visitSummary: summary,
+      completedAt,
+      completedBy,
+      isCompleted: isCompleted || Boolean(summary),
     });
   }
 
-  // Se houver algum local criado exclusivamente no aparelho do usuário
+  // Se houver algum local completamente novo criado exclusivamente offline no aparelho
   for (const local of localVisits) {
     if (!remoteMap.has(local.id)) {
-      result.push(local);
+      result.push({
+        ...local,
+        slots: sanitizeSlots(local.slots || []),
+      });
       hasLocalChanges = true;
     }
   }

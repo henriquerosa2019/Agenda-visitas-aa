@@ -47,7 +47,7 @@ export const INITIAL_AGENDA: AgendaData = {
       addr: 'Rua Conde de Bonfim, N° 1030 – Tijuca',
       date: '2026-09-28',
       time: '16:00',
-      slots: ['Marcio Motta', '', 'Roberto'],
+      slots: ['Marcio Motta', 'Roberto', ''],
       notes: 'Encerramento da escala de visitas de setembro',
     },
   ]),

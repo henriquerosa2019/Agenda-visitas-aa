@@ -21,6 +21,7 @@ import {
   subscribeToVisitsChanges,
   mergeLocalAndRemoteVisits,
 } from './lib/supabase';
+import { isDuplicateVolunteer, sanitizeSlots } from './lib/validation';
 import {
   FileText,
   CheckCircle2,
@@ -36,7 +37,7 @@ import {
   X,
 } from 'lucide-react';
 
-const CURRENT_STORAGE_KEY = 'escala_visitas_aa_data_v8';
+const CURRENT_STORAGE_KEY = 'escala_visitas_aa_data_v9';
 
 type SyncStatus = 'idle' | 'syncing' | 'connected' | 'error' | 'offline';
 
@@ -47,6 +48,7 @@ export default function App() {
       localStorage.removeItem('escala_visitas_aa_data_v5');
       localStorage.removeItem('escala_visitas_aa_data_v6');
       localStorage.removeItem('escala_visitas_aa_data_v7');
+      localStorage.removeItem('escala_visitas_aa_data_v8');
     } catch (e) {}
 
     try {
@@ -55,16 +57,21 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.visits) && parsed.visits.length > 0) {
           const cleanedVisits = parsed.visits.map((v: VisitItem) => {
+            const cleanSlots = sanitizeSlots(v.slots || []);
             if (v.id === 'sept-14-10h' || v.name.toLowerCase().includes('gávea')) {
               return {
                 ...v,
+                slots: cleanSlots,
                 visitSummary: undefined,
                 completedBy: undefined,
                 completedAt: undefined,
                 isCompleted: false,
               };
             }
-            return v;
+            return {
+              ...v,
+              slots: cleanSlots,
+            };
           });
           return {
             groupName: parsed.groupName || INITIAL_AGENDA.groupName,
@@ -255,9 +262,14 @@ export default function App() {
         clearTimeout(debounceTimers.current[key]);
         delete debounceTimers.current[key];
       });
-      // 2. Persistir imediatamente na nuvem todas as visitas da agenda
+      // 2. Persistir imediatamente na nuvem todas as visitas da agenda sanitizadas
       if (state.visits && state.visits.length > 0) {
-        bulkUpsertVisits(state.visits);
+        const sanitized = state.visits.map((v) => ({
+          ...v,
+          slots: sanitizeSlots(v.slots),
+        }));
+        setState((prev) => ({ ...prev, visits: sanitized }));
+        bulkUpsertVisits(sanitized);
       }
       showToast('✅ Alterações da agenda salvas com sucesso!');
     }
@@ -280,14 +292,18 @@ export default function App() {
   };
 
   const handleSaveModalVisit = (visit: VisitItem) => {
-    pendingVisitsRef.current[visit.id] = visit;
+    const cleanVisit: VisitItem = {
+      ...visit,
+      slots: sanitizeSlots(visit.slots),
+    };
+    pendingVisitsRef.current[cleanVisit.id] = cleanVisit;
     setState((prev) => {
-      const exists = prev.visits.some((v) => v.id === visit.id);
+      const exists = prev.visits.some((v) => v.id === cleanVisit.id);
       let updated: VisitItem[];
       if (exists) {
-        updated = prev.visits.map((v) => (v.id === visit.id ? visit : v));
+        updated = prev.visits.map((v) => (v.id === cleanVisit.id ? cleanVisit : v));
       } else {
-        updated = [...prev.visits, visit];
+        updated = [...prev.visits, cleanVisit];
       }
       return {
         ...prev,
@@ -296,7 +312,7 @@ export default function App() {
     });
 
     // Gravar no Supabase (o trigger PostgreSQL envia e-mails se houver novos voluntários)
-    persistVisit(visit);
+    persistVisit(cleanVisit);
     showToast('✅ Dados do local e voluntários salvos com sucesso!');
   };
 
@@ -415,22 +431,67 @@ export default function App() {
       }
       const targetToSave = { ...updatedTarget };
       debounceTimers.current[visitId] = setTimeout(() => {
+        // Validação defensiva de duplicidade antes do salvamento assíncrono
+        const currentVisits = state.visits;
+        const candidate = (targetToSave.slots[slotIdx] || '').trim();
+        if (candidate && isDuplicateVolunteer(candidate, slotIdx, targetToSave, currentVisits)) {
+          // Detectou duplicidade no mesmo local e dia: reverte vaga e alerta
+          const cleanSlots = [...targetToSave.slots];
+          cleanSlots[slotIdx] = '';
+          const cleanedTarget = { ...targetToSave, slots: cleanSlots };
+          setState((prev) => ({
+            ...prev,
+            visits: prev.visits.map((v) => (v.id === visitId ? cleanedTarget : v)),
+          }));
+          showToast(`⚠️ O voluntário "${candidate}" já está escalado para este local nesta data! Não é permitido duplicidade.`);
+          delete pendingVisitsRef.current[visitId];
+          persistVisit(cleanedTarget);
+          return;
+        }
+
         persistVisit(targetToSave);
         delete pendingVisitsRef.current[visitId];
       }, 600);
     }
   };
 
-  const handleFlushSlot = (visitId: string) => {
+  const handleFlushSlot = (visitId: string, slotIdx?: number) => {
     if (debounceTimers.current[visitId]) {
       clearTimeout(debounceTimers.current[visitId]);
       delete debounceTimers.current[visitId];
     }
-    const target = pendingVisitsRef.current[visitId] || state.visits.find((v) => v.id === visitId);
-    if (target) {
-      delete pendingVisitsRef.current[visitId];
-      persistVisit(target);
+    const currentVisits = state.visits;
+    const target = pendingVisitsRef.current[visitId] || currentVisits.find((v) => v.id === visitId);
+    if (!target) return;
+
+    let hasDuplicate = false;
+    let duplicateName = '';
+    const cleanSlots = [...target.slots];
+
+    for (let i = 0; i < cleanSlots.length; i++) {
+      const name = (cleanSlots[i] || '').trim();
+      if (!name) continue;
+      if (isDuplicateVolunteer(name, i, target, currentVisits)) {
+        hasDuplicate = true;
+        duplicateName = name;
+        cleanSlots[i] = '';
+      }
     }
+
+    if (hasDuplicate) {
+      const cleanedTarget = { ...target, slots: cleanSlots };
+      setState((prev) => ({
+        ...prev,
+        visits: prev.visits.map((v) => (v.id === visitId ? cleanedTarget : v)),
+      }));
+      showToast(`⚠️ O voluntário "${duplicateName}" já está escalado para este local nesta data! Não é permitido duplicidade.`);
+      delete pendingVisitsRef.current[visitId];
+      persistVisit(cleanedTarget);
+      return;
+    }
+
+    delete pendingVisitsRef.current[visitId];
+    persistVisit(target);
   };
 
   const handleRemoveSlot = (visitId: string, slotIdx: number) => {
@@ -789,7 +850,7 @@ export default function App() {
                             value={name}
                             placeholder="vaga aberta"
                             onChange={(e) => handleSlotChange(visit.id, ni, e.target.value)}
-                            onBlur={() => handleFlushSlot(visit.id)}
+                            onBlur={() => handleFlushSlot(visit.id, ni)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 (e.target as HTMLInputElement).blur();

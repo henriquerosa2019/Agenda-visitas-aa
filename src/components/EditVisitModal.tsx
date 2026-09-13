@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VisitItem, getWeekdayName } from '../types';
 import { HOSPITAL_PRESETS } from '../data/initialData';
+import { normalizeVolunteerName, sanitizeSlots } from '../lib/validation';
 import {
   Building2,
   MapPin,
@@ -99,6 +100,19 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
       return;
     }
 
+    // Verificar duplicidade de voluntários nos slots preenchidos
+    const seenVolunteers = new Set<string>();
+    for (const slotName of slots) {
+      const trimmed = slotName.trim();
+      if (!trimmed) continue;
+      const norm = normalizeVolunteerName(trimmed);
+      if (seenVolunteers.has(norm)) {
+        setError(`O voluntário "${trimmed}" está repetido nas vagas deste local. Não é permitido lançar o mesmo voluntário em duplicidade.`);
+        return;
+      }
+      seenVolunteers.add(norm);
+    }
+
     const newVisit: VisitItem = {
       ...(initialVisit || {}),
       id: initialVisit ? initialVisit.id : `visit-${Date.now()}`,
@@ -106,7 +120,7 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
       addr: addr.trim(),
       date,
       time,
-      slots: slots.map((s) => s.trim()),
+      slots: sanitizeSlots(slots.map((s) => s.trim())),
       notes: notes.trim() || undefined,
     };
 
