@@ -12,7 +12,7 @@ Este documento registra todas as decisões de design, regras de negócio, arquit
 - **Stack Tecnológica:** 
   - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React (ícones), Vercel Analytics
   - **PWA:** `manifest.json`, `sw.js` para suporte a app instalável
-  - **Persistência & Sincronização em Nuvem:** Supabase (`aa_visits`) com Postgres Realtime e cache local de contingência (`localStorage` `escala_visitas_aa_data_v8`).
+  - **Persistência & Sincronização em Nuvem:** Supabase (`aa_visits`) com Postgres Realtime e cache local de contingência (`localStorage` `escala_visitas_aa_data_v9`).
   - **Credenciais Supabase:** Configuração via variáveis de ambiente (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) ou via interface com modal de configuração (`SupabaseConfigModal`).
 ---
 
