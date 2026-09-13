@@ -18,6 +18,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       .register('/sw.js')
       .then((reg) => {
         console.log('[PWA] Service Worker registrado:', reg.scope);
+        reg.update();
       })
       .catch((err) => {
         console.warn('[PWA] Falha ao registrar Service Worker:', err);

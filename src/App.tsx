@@ -190,18 +190,16 @@ export default function App() {
         }
         setSyncStatus('connected');
       } else {
-        // Mesclar visitas do banco com preenchimentos que já estavam salvos no aparelho do usuário
-        const { merged, hasLocalChanges } = mergeLocalAndRemoteVisits(state.visits, remoteVisits);
+        // As visitas do Supabase são a autoridade central da escala
+        const cleanVisits = remoteVisits.map((v) => ({
+          ...v,
+          slots: sanitizeSlots(v.slots || []),
+        }));
 
         setState((prev) => ({
           ...prev,
-          visits: sortVisitsAscending(merged),
+          visits: sortVisitsAscending(cleanVisits),
         }));
-
-        // Se o celular do usuário continha voluntários nas vagas que ainda não estavam no banco, envia para o Supabase!
-        if (hasLocalChanges) {
-          await bulkUpsertVisits(merged);
-        }
 
         setSyncStatus('connected');
       }
@@ -224,7 +222,10 @@ export default function App() {
             if (pendingVisitsRef.current[remoteV.id]) {
               return pendingVisitsRef.current[remoteV.id];
             }
-            return remoteV;
+            return {
+              ...remoteV,
+              slots: sanitizeSlots(remoteV.slots || []),
+            };
           });
           return {
             ...prev,
