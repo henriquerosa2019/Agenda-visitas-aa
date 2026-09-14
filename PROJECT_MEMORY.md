@@ -108,8 +108,15 @@ git push origin main
   - **Todos os dias às 08:00 BRT** (`0 11 * * *`)
   - **Execução manual sob demanda:** Botão *Run workflow* no GitHub Actions ou clique duplo no arquivo `executar-analise-agora.bat` na raiz do projeto.
 - **Processamento:** `scripts/analyze-visits.mjs`
-  - Consulta o Supabase e compila os 5 itens: Resumo Geral, Status das Vagas, Voluntários Agendados (com unificação de grafias como `Marcio.Motta` e `Marcio Motta`), Locais Agendados (apenas instituições com agendamento ativo, contendo Local, Dia, Hora e Nomes) e Status dos Resumos de Visita.
-  - Diagrama o e-mail em HTML nas cores oficiais de A.A. e envia via Brevo para Henrique e Danilo.
+  - Consulta o Supabase e compila os itens da escala:
+    1. **🚨 Visitas Programadas para HOJE:** Bloco de destaque operacional no topo com Local, Horário, Companheiro(s) escalados, status das vagas e Endereço (ou mensagem amigável caso não haja visita hoje com indicação da próxima visita).
+    2. **Assunto Dinâmico do E-mail:** Altera automaticamente para `🔔 [HOJE TEM VISITA] Escala de Visitas A.A. — DD/MM/AAAA` quando houver visitas no dia, ou `📊 Relatório Diário de Visitas A.A. — DD/MM/AAAA` nos demais dias.
+    3. **Resumo Geral das Escalas:** Total de visitas, realizadas, hoje e futuras.
+    4. **Status das Vagas de Voluntários:** Total ofertadas, preenchidas e abertas (% de ocupação).
+    5. **Voluntários Agendados:** Unificação de grafias (ex: `Marcio.Motta` e `Marcio Motta`) ordenados por número de visitas.
+    6. **Locais Agendados:** Todas as visitas futuras com dia, hora e nomes confirmados.
+    7. **Status dos Resumos de Visita:** Visitas passadas pendentes de relato.
+  - Diagrama o e-mail em HTML nas cores oficiais de A.A. e envia via Brevo para Henrique e Danilo (com contingência para Resend).
 
 ### 4. Resolução de Rede & IP Dinâmico
 - **Forçar IPv4:** Configurado `--dns-result-order=ipv4first` no script `analyze` do `package.json` e no arquivo batch `scripts/run-daily-analysis.bat` para garantir conectividade direta via IPv4 homologado no Brevo.
