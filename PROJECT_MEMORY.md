@@ -108,9 +108,10 @@ git push origin main
   - **Todos os dias às 08:00 BRT** (`0 11 * * *`)
   - **Execução manual sob demanda:** Botão *Run workflow* no GitHub Actions ou clique duplo no arquivo `executar-analise-agora.bat` na raiz do projeto.
 - **Processamento:** `scripts/analyze-visits.mjs`
-  - Consulta o Supabase e compila os itens da escala:
-    1. **🚨 Visitas Programadas para HOJE:** Bloco de destaque operacional no topo com Local, Horário, Companheiro(s) escalados, status das vagas e Endereço (ou mensagem amigável caso não haja visita hoje com indicação da próxima visita).
-    2. **Assunto Dinâmico do E-mail:** Altera automaticamente para `🔔 [HOJE TEM VISITA] Escala de Visitas A.A. — DD/MM/AAAA` quando houver visitas no dia, ou `📊 Relatório Diário de Visitas A.A. — DD/MM/AAAA` nos demais dias.
+  - **Garantia de Envio no Dia da Visita:** Como a automação roda diariamente às 08:00 BRT, **sempre no dia em que houver visita agendada** o sistema identifica a data (`todayStr`), compila os Locais, Horários, Endereços e `Companheiro(a)s Voluntario(a)s:`, altera o assunto para alerta máximo (`🔔 [HOJE TEM VISITA]`) e dispara o e-mail automaticamente via Brevo para Henrique e Danilo.
+  - Estrutura completa do relatório:
+    1. **🚨 Visitas Programadas para HOJE:** Bloco nobre no topo com Local, Horário, `Companheiro(a)s Voluntario(a)s:` escalados, vagas em aberto (se houver) e Endereço (ou mensagem amigável com a próxima visita agendada quando não houver escala no dia).
+    2. **Assunto Dinâmico do E-mail:** `🔔 [HOJE TEM VISITA] Escala de Visitas A.A. — DD/MM/AAAA` em dias de visita, e `📊 Relatório Diário de Visitas A.A. — DD/MM/AAAA` nos demais dias.
     3. **Resumo Geral das Escalas:** Total de visitas, realizadas, hoje e futuras.
     4. **Status das Vagas de Voluntários:** Total ofertadas, preenchidas e abertas (% de ocupação).
     5. **Voluntários Agendados:** Unificação de grafias (ex: `Marcio.Motta` e `Marcio Motta`) ordenados por número de visitas.
