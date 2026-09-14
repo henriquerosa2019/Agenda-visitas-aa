@@ -58,6 +58,34 @@ function getConfirmedVolunteers(slots) {
   return confirmados;
 }
 
+function getSlotStats(slots) {
+  const rawSlots = Array.isArray(slots) ? slots : [];
+  const confirmados = getConfirmedVolunteers(rawSlots);
+  const openCount = rawSlots.filter((s) => !(s || '').trim()).length;
+  return { confirmados, openCount, totalSlots: rawSlots.length };
+}
+
+function getBrasiliaDateInfo() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const map = {};
+  for (const p of parts) map[p.type] = p.value;
+  const todayStr = `${map.year}-${map.month}-${map.day}`;
+  const dateFormatted = `${map.day}/${map.month}/${map.year}`;
+  const timeFormatted = `${map.hour}:${map.minute}:${map.second}`;
+  return { now, todayStr, dateFormatted, timeFormatted };
+}
+
 const supabaseUrl = normalizeUrl(process.env.VITE_SUPABASE_URL);
 const supabaseKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
@@ -72,6 +100,8 @@ async function sendReportEmail({
   now,
   dateFormatted,
   timeFormatted,
+  visitasDeHoje = [],
+  proximaVisita = null,
   totalVisitas,
   visitasPassadas,
   visitasHoje,
@@ -102,6 +132,70 @@ async function sendReportEmail({
     console.log('ℹ️ Nenhum destinatário configurado em REPORT_EMAIL_TO.');
     return;
   }
+
+  const emailSubject = visitasDeHoje && visitasDeHoje.length > 0
+    ? `🔔 [HOJE TEM VISITA] Escala de Visitas A.A. — ${dateFormatted}`
+    : `📊 Relatório Diário de Visitas A.A. — ${dateFormatted}`;
+
+  const visitasDeHojeHtml = visitasDeHoje && visitasDeHoje.length > 0
+    ? `
+      <!-- Bloco Destaque: Visitas do Dia -->
+      <div style="background-color: #FFFDF5; border: 2px solid #D97706; border-radius: 10px; padding: 18px 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.12);">
+        <div style="margin-bottom: 12px; border-bottom: 1px solid #FDE68A; padding-bottom: 8px;">
+          <h2 style="margin: 0; font-size: 16px; font-weight: bold; color: #92400E; text-transform: uppercase; letter-spacing: 0.5px;">
+            🚨 VISITAS PROGRAMADAS PARA HOJE (${dateFormatted})
+          </h2>
+        </div>
+        <p style="margin: 0 0 14px 0; font-size: 13px; color: #78350F;">
+          Lembrete operacional da escala: temos <strong>${visitasDeHoje.length} visita(s)</strong> programada(s) para o dia de hoje:
+        </p>
+        ${visitasDeHoje
+          .map((v) => {
+            const { confirmados, openCount } = getSlotStats(v.slots);
+            const statusVagas = openCount > 0
+              ? `<span style="color: #B45309; font-weight: 500;">(${openCount} vaga(s) ainda em aberto)</span>`
+              : `<span style="color: #15803D; font-weight: 600;">(Vagas 100% preenchidas)</span>`;
+
+            return `
+              <div style="background-color: #FFFFFF; border: 1px solid #FDE68A; border-left: 4px solid #123C6B; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size: 15px; font-weight: bold; color: #123C6B; margin-bottom: 4px;">
+                  🏥 Local: ${v.name}
+                </div>
+                ${v.addr ? `<div style="font-size: 12px; color: #64748B; margin-bottom: 8px;">📍 Endereço: ${v.addr}</div>` : ''}
+                <div style="font-size: 13px; color: #1E2A3F; margin-bottom: 8px;">
+                  ⏰ <strong>Horário:</strong> <span style="background-color: #123C6B; color: #F6D269; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 13px;">${v.time}</span>
+                </div>
+                <div style="font-size: 13px; color: #1E2A3F; margin-bottom: 4px;">
+                  👥 <strong>Companheiro(s) Escalado(s):</strong> ${
+                    confirmados.length
+                      ? `<span style="color: #15803D; font-weight: bold;">${confirmados.join(', ')}</span>`
+                      : `<span style="color: #DC2626; font-weight: bold;">⚠️ NENHUM COMPANHEIRO ESCALADO!</span>`
+                  }
+                </div>
+                <div style="font-size: 12px;">
+                  ${statusVagas}
+                </div>
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+    `
+    : `
+      <!-- Nenhuma Visita Hoje -->
+      <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 14px 18px; margin-bottom: 22px;">
+        <div style="font-size: 14px; font-weight: bold; color: #166534; margin-bottom: 4px;">
+          ✅ Nenhuma visita da escala programada para hoje (${dateFormatted}).
+        </div>
+        ${
+          proximaVisita
+            ? `<div style="font-size: 13px; color: #15803D;">
+                📅 <strong>Próxima Visita Agendada:</strong> ${formatBrDate(proximaVisita.date)} às ${proximaVisita.time} — <strong>${proximaVisita.name}</strong>
+              </div>`
+            : ''
+        }
+      </div>
+    `;
 
   const voluntariosHtml = voluntarioEntries.length
     ? voluntarioEntries
@@ -156,7 +250,7 @@ async function sendReportEmail({
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Relatório Diário de Visitas A.A.</title>
+  <title>${emailSubject}</title>
 </head>
 <body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F1F5F9; color: #1E2A3F;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #E2E8F0;">
@@ -171,6 +265,7 @@ async function sendReportEmail({
     </div>
 
     <div style="padding: 24px 28px;">
+      ${visitasDeHojeHtml}
       
       <!-- Seção 1: Resumo Geral -->
       <div style="margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid #E2E8F0;">
@@ -299,7 +394,7 @@ async function sendReportEmail({
             body: JSON.stringify({
               sender: { name: 'Agenda de Visitas A.A.', email: senderEmail },
               to: toEmails.map((email) => ({ email })),
-              subject: `📊 Relatório de Visitas A.A. — ${dateFormatted}`,
+              subject: emailSubject,
               htmlContent: html,
             }),
           });
@@ -331,7 +426,7 @@ async function sendReportEmail({
           body: JSON.stringify({
             from: 'Agenda AA <onboarding@resend.dev>',
             to: recipients,
-            subject: `📊 Relatório de Visitas A.A. — ${dateFormatted}`,
+            subject: emailSubject,
             html: html,
           }),
         });
@@ -358,10 +453,7 @@ async function sendReportEmail({
 }
 
 export async function runVisitsAnalysis() {
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const dateFormatted = now.toLocaleDateString('pt-BR');
-  const timeFormatted = now.toLocaleTimeString('pt-BR');
+  const { now, todayStr, dateFormatted, timeFormatted } = getBrasiliaDateInfo();
 
   console.log('\n' + '='.repeat(68));
   console.log(`  📊 RELATÓRIO DIÁRIO DE VISITAS A.A. — ${dateFormatted} ${timeFormatted}`);
@@ -397,6 +489,8 @@ export async function runVisitsAnalysis() {
   const voluntarioAgg = {};
   const visitasSemResumo = [];
   const visitasComResumo = [];
+  const visitasDeHoje = [];
+  const visitasFuturasList = [];
 
   for (const v of visits) {
     const rawSlots = Array.isArray(v.slots) ? v.slots : [];
@@ -437,15 +531,45 @@ export async function runVisitsAnalysis() {
       }
     } else if (v.date === todayStr) {
       visitasHoje++;
+      visitasDeHoje.push(v);
     } else {
       visitasFuturas++;
+      visitasFuturasList.push(v);
     }
   }
+
+  const proximaVisita = visitasFuturasList.length > 0
+    ? visitasFuturasList.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))[0]
+    : null;
 
   const taxaOcupacao =
     totalVagasOfertadas > 0
       ? ((totalVagasPreenchidas / totalVagasOfertadas) * 100).toFixed(1)
       : 0;
+
+  // Destaque Especial: Visitas de Hoje no Terminal
+  if (visitasDeHoje.length > 0) {
+    console.log(`\n🚨 ====================================================================`);
+    console.log(`   🔔 VISITAS PROGRAMADAS PARA HOJE (${dateFormatted}) — ${visitasDeHoje.length} VISITA(S)`);
+    console.log(`====================================================================`);
+    visitasDeHoje.forEach((v, idx) => {
+      const { confirmados, openCount } = getSlotStats(v.slots);
+      console.log(`   ${idx + 1}. Local: ${v.name}`);
+      if (v.addr) console.log(`      Endereço: ${v.addr}`);
+      console.log(`      Horário: ${v.time}`);
+      console.log(`      Companheiro(s): ${confirmados.length ? confirmados.join(', ') : '⚠️ NENHUM COMPANHEIRO ESCALADO'}`);
+      console.log(`      Status vagas: ${openCount > 0 ? `${openCount} vaga(s) em aberto` : '100% preenchido'}`);
+      if (idx < visitasDeHoje.length - 1) {
+        console.log('      ' + '-'.repeat(55));
+      }
+    });
+    console.log(`====================================================================`);
+  } else {
+    console.log(`\n✅ Nenhuma visita da escala programada para hoje (${dateFormatted}).`);
+    if (proximaVisita) {
+      console.log(`   📅 Próxima visita agendada: ${formatBrDate(proximaVisita.date)} às ${proximaVisita.time} — ${proximaVisita.name}`);
+    }
+  }
 
   console.log(`\n📌 1. RESUMO GERAL DAS ESCALAS:`);
   console.log(`   • Total de visitas cadastradas:    ${totalVisitas}`);
@@ -509,9 +633,27 @@ export async function runVisitsAnalysis() {
 
   // Gerar resumo em Markdown persistente
   const reportPath = path.resolve('RELATORIO_VISITAS.md');
+  const hojeMarkdownSection = visitasDeHoje.length > 0
+    ? `## 🔔 Visitas Programadas para HOJE (${dateFormatted})
+${visitasDeHoje.map((v) => {
+  const { confirmados, openCount } = getSlotStats(v.slots);
+  const statusVagas = openCount > 0 ? `*(${openCount} vaga(s) ainda em aberto)*` : `*(Vagas 100% preenchidas)*`;
+  return `- **Local:** ${v.name}\n  - **Horário:** ${v.time}\n  - **Endereço:** ${v.addr || 'Não informado'}\n  - **Companheiro(s):** ${confirmados.length ? confirmados.join(', ') : '⚠️ NENHUM COMPANHEIRO ESCALADO'}\n  - **Status das vagas:** ${statusVagas}`;
+}).join('\n\n')}
+
+---
+`
+    : `## ℹ️ Visitas de Hoje (${dateFormatted})
+_Nenhuma visita da escala programada para hoje._
+${proximaVisita ? `\n- **Próxima Visita:** ${formatBrDate(proximaVisita.date)} às ${proximaVisita.time} — ${proximaVisita.name}` : ''}
+
+---
+`;
+
   const markdownReport = `# 📊 Relatório Diário de Visitas A.A.
 *Gerado em: ${dateFormatted} às ${timeFormatted}*
 
+${hojeMarkdownSection}
 ## 📈 1. Resumo Geral das Escalas
 - **Total de Visitas Cadastradas:** ${totalVisitas}
 - **Visitas Já Realizadas (Passado):** ${visitasPassadas}
@@ -558,11 +700,13 @@ ${
     fs.writeFileSync(reportPath, markdownReport, 'utf-8');
   } catch (e) {}
 
-  // Enviar e-mail via Resend
+  // Enviar e-mail via Brevo / Resend
   await sendReportEmail({
     now,
     dateFormatted,
     timeFormatted,
+    visitasDeHoje,
+    proximaVisita,
     totalVisitas,
     visitasPassadas,
     visitasHoje,
