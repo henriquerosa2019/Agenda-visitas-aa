@@ -1,18 +1,16 @@
 # 📊 Relatório Diário de Visitas A.A.
-*Gerado em: 14/09/2026 às 09:48:29*
+*Gerado em: 14/09/2026 às 09:55:09*
 
 ## 🔔 Visitas Programadas para HOJE (14/09/2026)
 - **Local:** Clínica da Gávea – Unidade Tijuca
   - **Horário:** 10:00
   - **Endereço:** Rua Dr. Pereira dos Santos, N° 18 – Tijuca
-  - **Companheiro(s):** Danilo, Marcio Motta
-  - **Status das vagas:** *(Vagas 100% preenchidas)*
+  - **Companheiro(a)s Voluntario(a)s:** Danilo, Marcio Motta
 
 - **Local:** Hospital São Francisco na Providência de Deus
   - **Horário:** 16:00
   - **Endereço:** Rua Conde de Bonfim, N° 1030 – Tijuca
-  - **Companheiro(s):** Marcio Motta, Cadu
-  - **Status das vagas:** *(Vagas 100% preenchidas)*
+  - **Companheiro(a)s Voluntario(a)s:** Marcio Motta, Cadu
 
 ---
 

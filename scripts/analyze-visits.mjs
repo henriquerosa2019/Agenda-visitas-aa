@@ -153,8 +153,8 @@ async function sendReportEmail({
           .map((v) => {
             const { confirmados, openCount } = getSlotStats(v.slots);
             const statusVagas = openCount > 0
-              ? `<span style="color: #B45309; font-weight: 500;">(${openCount} vaga(s) ainda em aberto)</span>`
-              : `<span style="color: #15803D; font-weight: 600;">(Vagas 100% preenchidas)</span>`;
+              ? `<div style="font-size: 12px; color: #B45309; font-style: italic; margin-top: 4px;">(${openCount} vaga(s) ainda em aberto)</div>`
+              : '';
 
             return `
               <div style="background-color: #FFFFFF; border: 1px solid #FDE68A; border-left: 4px solid #123C6B; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
@@ -165,16 +165,14 @@ async function sendReportEmail({
                 <div style="font-size: 13px; color: #1E2A3F; margin-bottom: 8px;">
                   ⏰ <strong>Horário:</strong> <span style="background-color: #123C6B; color: #F6D269; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; font-size: 13px;">${v.time}</span>
                 </div>
-                <div style="font-size: 13px; color: #1E2A3F; margin-bottom: 4px;">
-                  👥 <strong>Companheiro(s) Escalado(s):</strong> ${
+                <div style="font-size: 13px; color: #1E2A3F;">
+                  👥 <strong>Companheiro(a)s Voluntario(a)s:</strong> ${
                     confirmados.length
                       ? `<span style="color: #15803D; font-weight: bold;">${confirmados.join(', ')}</span>`
-                      : `<span style="color: #DC2626; font-weight: bold;">⚠️ NENHUM COMPANHEIRO ESCALADO!</span>`
+                      : `<span style="color: #DC2626; font-weight: bold;">⚠️ NENHUM(A) COMPANHEIRO(A) ESCALADO(A)!</span>`
                   }
                 </div>
-                <div style="font-size: 12px;">
-                  ${statusVagas}
-                </div>
+                ${statusVagas}
               </div>
             `;
           })
@@ -557,8 +555,10 @@ export async function runVisitsAnalysis() {
       console.log(`   ${idx + 1}. Local: ${v.name}`);
       if (v.addr) console.log(`      Endereço: ${v.addr}`);
       console.log(`      Horário: ${v.time}`);
-      console.log(`      Companheiro(s): ${confirmados.length ? confirmados.join(', ') : '⚠️ NENHUM COMPANHEIRO ESCALADO'}`);
-      console.log(`      Status vagas: ${openCount > 0 ? `${openCount} vaga(s) em aberto` : '100% preenchido'}`);
+      console.log(`      Companheiro(a)s Voluntario(a)s: ${confirmados.length ? confirmados.join(', ') : '⚠️ NENHUM(A) COMPANHEIRO(A) ESCALADO(A)'}`);
+      if (openCount > 0) {
+        console.log(`      Vagas em aberto: ${openCount} vaga(s)`);
+      }
       if (idx < visitasDeHoje.length - 1) {
         console.log('      ' + '-'.repeat(55));
       }
@@ -637,8 +637,8 @@ export async function runVisitsAnalysis() {
     ? `## 🔔 Visitas Programadas para HOJE (${dateFormatted})
 ${visitasDeHoje.map((v) => {
   const { confirmados, openCount } = getSlotStats(v.slots);
-  const statusVagas = openCount > 0 ? `*(${openCount} vaga(s) ainda em aberto)*` : `*(Vagas 100% preenchidas)*`;
-  return `- **Local:** ${v.name}\n  - **Horário:** ${v.time}\n  - **Endereço:** ${v.addr || 'Não informado'}\n  - **Companheiro(s):** ${confirmados.length ? confirmados.join(', ') : '⚠️ NENHUM COMPANHEIRO ESCALADO'}\n  - **Status das vagas:** ${statusVagas}`;
+  const statusVagas = openCount > 0 ? `\n  - **Vagas em aberto:** ${openCount} vaga(s)` : '';
+  return `- **Local:** ${v.name}\n  - **Horário:** ${v.time}\n  - **Endereço:** ${v.addr || 'Não informado'}\n  - **Companheiro(a)s Voluntario(a)s:** ${confirmados.length ? confirmados.join(', ') : '⚠️ NENHUM(A) COMPANHEIRO(A) ESCALADO(A)'}${statusVagas}`;
 }).join('\n\n')}
 
 ---
