@@ -20,3 +20,4 @@ if exist "%NODE_BIN%" (
 )
 
 echo. >> "%LOG_FILE%"
+exit /b 0

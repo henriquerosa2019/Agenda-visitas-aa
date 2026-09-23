@@ -1,32 +1,27 @@
 # 📊 Relatório Diário de Visitas A.A.
-*Gerado em: 14/09/2026 às 09:55:09*
+*Gerado em: 23/09/2026 às 08:09:50*
 
-## 🔔 Visitas Programadas para HOJE (14/09/2026)
-- **Local:** Clínica da Gávea – Unidade Tijuca
-  - **Horário:** 10:00
-  - **Endereço:** Rua Dr. Pereira dos Santos, N° 18 – Tijuca
-  - **Companheiro(a)s Voluntario(a)s:** Danilo, Marcio Motta
+## ℹ️ Visitas de Hoje (23/09/2026)
+_Nenhuma visita da escala programada para hoje._
 
-- **Local:** Hospital São Francisco na Providência de Deus
-  - **Horário:** 16:00
-  - **Endereço:** Rua Conde de Bonfim, N° 1030 – Tijuca
-  - **Companheiro(a)s Voluntario(a)s:** Marcio Motta, Cadu
+- **Próxima Visita:** 28/09/2026 às 16:00 — Hospital São Francisco na Providência de Deus
 
 ---
 
 ## 📈 1. Resumo Geral das Escalas
 - **Total de Visitas Cadastradas:** 5
-- **Visitas Já Realizadas (Passado):** 0
-- **Visitas Agendadas para HOJE:** 2
-- **Visitas Futuras no Calendário:** 3
+- **Visitas Já Realizadas (Passado):** 4
+- **Visitas Agendadas para HOJE:** 0
+- **Visitas Futuras no Calendário:** 1
 
 ## 👥 2. Status das Vagas de Voluntários
-- **Total de Vagas Disponibilizadas:** 13
-- **Vagas Confirmadas/Preenchidas:** 7 (53.8%)
-- **Vagas Ainda em Aberto:** 6
+- **Total de Vagas Disponibilizadas:** 10
+- **Vagas Confirmadas/Preenchidas:** 10 (100.0%)
+- **Vagas Ainda em Aberto:** 0
 
 ## 🤝 3. Voluntários Agendados
-- **Marcio Motta:** 3 visita(s)
+- **Marcio Motta:** 4 visita(s)
+- **Pedro H :** 2 visita(s)
 - **Danilo:** 1 visita(s)
 - **Cadu:** 1 visita(s)
 - **Claudia:** 1 visita(s)
@@ -43,13 +38,17 @@
 
 - **Local:** Hospital Casa Menssana
   - **Dia:** 16/09/2026 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Hora:** 19:30
-  - **Voluntários:** Claudia
+  - **Voluntários:** Claudia, Pedro H 
+
+- **Local:** Clínica Evolução
+  - **Dia:** 21/09/2026 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Hora:** 17:00
+  - **Voluntários:** Marcio Motta, Pedro H 
 
 - **Local:** Hospital São Francisco na Providência de Deus
   - **Dia:** 28/09/2026 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Hora:** 16:00
   - **Voluntários:** Marcio Motta, Roberto
 
 ## 📝 5. Status dos Resumos de Visitas Realizadas
-- **Com Resumo Registrado:** 0
-- **Com Resumo Pendente:** 0
-
+- **Com Resumo Registrado:** 3
+- **Com Resumo Pendente:** 1
+  - ⚠️ *[16/09/2026 às 19:30]* Hospital Casa Menssana
