@@ -1,18 +1,17 @@
 # 📊 Relatório Diário de Visitas A.A.
-*Gerado em: 23/09/2026 às 08:09:50*
+*Gerado em: 29/09/2026 às 10:26:11*
 
-## ℹ️ Visitas de Hoje (23/09/2026)
+## ℹ️ Visitas de Hoje (29/09/2026)
 _Nenhuma visita da escala programada para hoje._
 
-- **Próxima Visita:** 28/09/2026 às 16:00 — Hospital São Francisco na Providência de Deus
 
 ---
 
 ## 📈 1. Resumo Geral das Escalas
 - **Total de Visitas Cadastradas:** 5
-- **Visitas Já Realizadas (Passado):** 4
+- **Visitas Já Realizadas (Passado):** 5
 - **Visitas Agendadas para HOJE:** 0
-- **Visitas Futuras no Calendário:** 1
+- **Visitas Futuras no Calendário:** 0
 
 ## 👥 2. Status das Vagas de Voluntários
 - **Total de Vagas Disponibilizadas:** 10
@@ -49,6 +48,28 @@ _Nenhuma visita da escala programada para hoje._
   - **Voluntários:** Marcio Motta, Roberto
 
 ## 📝 5. Status dos Resumos de Visitas Realizadas
-- **Com Resumo Registrado:** 3
+- **Com Resumo Registrado:** 4
 - **Com Resumo Pendente:** 1
   - ⚠️ *[16/09/2026 às 19:30]* Hospital Casa Menssana
+
+---
+
+## 🎉 Encerramento do Mês de Setembro/2026 — 12º Passo
+> ### **Agenda do mês (Setembro) finalizada com sucesso!! Parabéns a todos(as) que se dedicaram a levar a msg do 12º Passo!!!** 👏🥳✨
+>
+> 🏆 **Total de Visitas Realizadas:** 5  
+> 👥 **Vagas Preenchidas:** 10 de 10 (100.0%)  
+> 🏥 **Instituições Assistidas:** Clínica da Gávea – Unidade Tijuca, Hospital São Francisco na Providência de Deus, Hospital Casa Menssana, Clínica Evolução  
+>
+> ### 👏 Companheiro(a)s que Serviram no Mês:
+> - 👏 **Marcio Motta:** 4 visita(s) realizada(s) 🏅
+> - 👏 **Pedro H :** 2 visita(s) realizada(s) 🏅
+> - 👏 **Danilo:** 1 visita(s) realizada(s) 🏅
+> - 👏 **Cadu:** 1 visita(s) realizada(s) 🏅
+> - 👏 **Claudia:** 1 visita(s) realizada(s) 🏅
+> - 👏 **Roberto:** 1 visita(s) realizada(s) 🏅
+>
+> ---
+> ### 🌟 Palavra de Destaque:
+> **“Quando tudo mais falhar, leve a msg, isto funciona!”**
+

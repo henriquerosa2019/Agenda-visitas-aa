@@ -119,6 +119,20 @@ git push origin main
     7. **Status dos Resumos de Visita:** Visitas passadas pendentes de relato.
   - Diagrama o e-mail em HTML nas cores oficiais de A.A. e envia via Brevo para Henrique e Danilo (com contingência para Resend).
 
+### 3.1. Encerramento Mensal e Parabenização do 12º Passo (Brevo Contacts)
+- **Gatilho de Final de Mês:**
+  - Acionado automaticamente no último dia do mês ou nos dias finais (>= dia 28) quando todas as visitas programadas do mês tiverem sido concluídas, ou sob demanda via `--end-of-month` e atalho `executar-parabenizacao-fim-de-mes.bat`.
+- **Destinatários Ampliados:**
+  - Consulta dinâmica via API REST v3 do Brevo (`GET /v3/contacts?limit=100`) para buscar **todas as contas cadastradas e ativas no Brevo**, unificando com os e-mails de `REPORT_EMAIL_TO`.
+- **Mensagem Oficial e Emoticons:**
+  - Título/Assunto: `🎉👏 Agenda do mês (xxx) finalizada com sucesso!! Parabéns a todos(as) que se dedicaram a levar a msg do 12º Passo!!! 🥳🙌✨` (onde `xxx` é preenchido com o nome do mês corrente, ex: `Setembro`).
+  - Emoticons expressivos de palmas e parabéns: `🎉`, `👏`, `🥳`, `🎊`, `🙌`, `✨`, `🏆`, `💙`.
+  - Quadro de honra com todos os companheiros que serviram no mês e quantidade de visitas, instituições atendidas e relatos das visitas.
+- **Rodapé em Destaque Nobre:**
+  - Caixa em azul marinho (`#123C6B`) com moldura e tipografia dourada (`#F6D269`):
+    > **“Quando tudo mais falhar, leve a msg, isto funciona!”**  
+    > *(Alcoólicos Anônimos — Capítulo 7: Trabalhando com os Outros)*
+
 ### 4. Resolução de Rede & IP Dinâmico
 - **Forçar IPv4:** Configurado `--dns-result-order=ipv4first` no script `analyze` do `package.json` e no arquivo batch `scripts/run-daily-analysis.bat` para garantir conectividade direta via IPv4 homologado no Brevo.
 - **Retentativas Automáticas & Fallback:** O script `scripts/analyze-visits.mjs` possui retry automático (até 3 tentativas) e chave de contingência automática para o **Resend** caso o Brevo oscile.
