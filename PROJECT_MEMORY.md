@@ -202,6 +202,18 @@ git push origin main
   5. `23/11 às 16:00`: Hospital São Francisco na Providência de Deus (3 vagas abertas)
 - **Coexistência:** O histórico completo de Outubro/2026 (5 visitas realizadas e relatos) permanece preservado e acessível na navegação de meses.
 
+### 4. Importação e Validação de Escala via Planilha Excel Parametrizada
+- **Módulo:** `src/lib/excel.ts` e `src/components/MonthRolloverModal.tsx`.
+- **Botão `📥 Baixar Modelo Oficial (.xlsx)`:** Gera diretamente no navegador o arquivo padronizado com as colunas: `Data (DD/MM/AAAA)`, `Horario (HH:MM)`, `Instituicao`, `Endereco`, `Voluntario_1`, `Voluntario_2`, `Voluntario_3`, `Observacoes`.
+- **Aba de Hospitais Cadastrados:** Inclui aba secundária na planilha com os nomes e endereços oficiais dos 4 hospitais parceiros de A.A.
+- **Validação Defensiva Automática:**
+  - Normaliza qualquer variação de data (`09/11/2026`, `09/11`, `2026-11-09` ou número de série do Excel).
+  - Normaliza horários (`10:00`, `10h`, `19h30`).
+  - Auto-preenche o endereço oficial caso deixado em branco e o hospital seja um dos parceiros.
+  - Bloqueia duplicatas de voluntários na mesma visita.
+  - Exibe painel de pré-visualização das visitas antes de salvar na nuvem.
+
+
 
 
 
