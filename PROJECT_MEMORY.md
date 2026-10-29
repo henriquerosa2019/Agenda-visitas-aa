@@ -202,16 +202,12 @@ git push origin main
   5. `23/11 às 16:00`: Hospital São Francisco na Providência de Deus (3 vagas abertas)
 - **Coexistência:** O histórico completo de Outubro/2026 (5 visitas realizadas e relatos) permanece preservado e acessível na navegação de meses.
 
-### 4. Importação e Validação de Escala via Planilha Excel Parametrizada
-- **Módulo:** `src/lib/excel.ts` e `src/components/MonthRolloverModal.tsx`.
-- **Botão `📥 Baixar Modelo Oficial (.xlsx)`:** Gera diretamente no navegador o arquivo padronizado com as colunas: `Data (DD/MM/AAAA)`, `Horario (HH:MM)`, `Instituicao`, `Endereco`, `Voluntario_1`, `Voluntario_2`, `Voluntario_3`, `Observacoes`.
-- **Aba de Hospitais Cadastrados:** Inclui aba secundária na planilha com os nomes e endereços oficiais dos 4 hospitais parceiros de A.A.
-- **Validação Defensiva Automática:**
-  - Normaliza qualquer variação de data (`09/11/2026`, `09/11`, `2026-11-09` ou número de série do Excel).
-  - Normaliza horários (`10:00`, `10h`, `19h30`).
-  - Auto-preenche o endereço oficial caso deixado em branco e o hospital seja um dos parceiros.
-  - Bloqueia duplicatas de voluntários na mesma visita.
-  - Exibe painel de pré-visualização das visitas antes de salvar na nuvem.
+### 4. Fluxo Nativo de Virada de Mês (Sem Planilhas)
+- **Acesso:** Clicar no botão **"Virar Mês / Nova Escala"** ou avançar para um novo mês vazio com a seta `>`.
+- **Comportamento:** O modal abre diretamente no formulário nativo, replicando automaticamente os locais habituais da escala anterior com as datas ajustadas para o novo mês, horários preservados, sugestões rápidas de hospitais, todas as vagas abertas e resumos limpos na tela.
+- **Edição Flexível:** Permite alterar datas, horários, nomes, endereços e quantidade de vagas, ou adicionar/remover instituições livremente.
+- **Publicação Direta:** O botão **"Confirmar e Iniciar Escala de [Mês]"** grava tudo no Supabase com isolamento de IDs e preservação integral dos meses anteriores.
+
 
 
 

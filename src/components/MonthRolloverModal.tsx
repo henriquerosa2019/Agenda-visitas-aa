@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { VisitItem, formatMonthYearBr, getWeekdayName, getNextYearMonth, formatDateBr } from '../types';
+import React, { useState, useEffect } from 'react';
+import { VisitItem, formatMonthYearBr, getWeekdayName, getNextYearMonth } from '../types';
 import { HOSPITAL_PRESETS } from '../data/initialData';
-import { downloadExcelTemplate, parseExcelFile, ExcelParseResult } from '../lib/excel';
 import {
   CalendarDays,
   Plus,
@@ -13,12 +12,7 @@ import {
   Calendar,
   Sparkles,
   Info,
-  FileSpreadsheet,
-  Download,
-  Upload,
   AlertCircle,
-  CheckCircle2,
-  Users,
 } from 'lucide-react';
 
 interface MonthRolloverModalProps {
@@ -46,22 +40,14 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
   existingVisits,
 }) => {
   const nextMonthDefault = getNextYearMonth(currentYearMonth || new Date().toISOString().slice(0, 7));
-  const [activeTab, setActiveTab] = useState<'excel' | 'manual'>('excel');
   const [targetYearMonth, setTargetYearMonth] = useState<string>(nextMonthDefault);
   const [venues, setVenues] = useState<VenueDraft[]>([]);
   const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Estados específicos da importação Excel
-  const [excelResult, setExcelResult] = useState<ExcelParseResult | null>(null);
-  const [isParsingExcel, setIsParsingExcel] = useState<boolean>(false);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Inicializa a lista de locais sugeridos quando o modal abre
+  // Inicializa a lista de locais sugeridos quando o modal abre, replicando o mês anterior
   useEffect(() => {
     if (!isOpen) {
-      setExcelResult(null);
       setError('');
       return;
     }
@@ -115,6 +101,7 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
     const val = e.target.value;
     if (val && val.length === 7) {
       setTargetYearMonth(val);
+      // Atualizar as datas dos locais existentes para o novo ano-mês
       setVenues((prev) =>
         prev.map((v) => {
           const oldDay = v.date.slice(8, 10) || '05';
@@ -166,60 +153,14 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
     setError('');
   };
 
-  // --- Processamento da Planilha Excel ---
-  const handleProcessExcel = async (file: File) => {
-    setIsParsingExcel(true);
-    setError('');
-    try {
-      const result = await parseExcelFile(file);
-      setExcelResult(result);
-      if (result.targetYearMonth) {
-        setTargetYearMonth(result.targetYearMonth);
-      }
-    } catch (err: any) {
-      setError(`Erro ao ler arquivo da planilha: ${err?.message || 'Formato não reconhecido'}`);
-    } finally {
-      setIsParsingExcel(false);
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleProcessExcel(file);
-    }
-  };
-
-  const handleDropFile = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleProcessExcel(file);
-    }
-  };
-
-  const handleConfirmExcelRollover = () => {
-    if (!excelResult || excelResult.visits.length === 0) {
-      setError('Não há visitas válidas identificadas na planilha para publicar.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    const destMonth = excelResult.targetYearMonth || targetYearMonth;
-    onConfirm(excelResult.visits, destMonth);
-    setIsSubmitting(false);
-    onClose();
-  };
-
-  // --- Confirmação do Formulário Manual ---
-  const handleManualSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetYearMonth) {
       setError('Por favor, selecione o mês e ano da nova escala.');
       return;
     }
 
+    // Validar se todos os locais possuem nome, endereço e data válida
     for (let i = 0; i < venues.length; i++) {
       const v = venues[i];
       if (!v.name.trim()) {
@@ -237,10 +178,14 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
     }
 
     setIsSubmitting(true);
+
+    // Gerar os novos registros com IDs únicos para o mês, vagas abertas e resumos limpos
     const nowTs = Date.now();
     const newVisitItems: VisitItem[] = venues.map((v, index) => {
       const timeClean = v.time ? v.time.replace(':', 'h') : '10h';
       const uniqueId = `visit-${v.date}-${timeClean}-${nowTs + index}`;
+
+      // Cria as vagas de voluntários totalmente limpas / abertas
       const cleanSlots = Array(Math.max(v.slotCount, 1)).fill('');
 
       return {
@@ -275,7 +220,7 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
                 Virada de Mês — Nova Escala de Visitas
               </h3>
               <p className="text-[11px] font-mono text-[#F6D269]">
-                Planejar novo mês com dados protegidos e histórico perpétuo
+                Planejar escala com dados e resumos limpos
               </p>
             </div>
           </div>
@@ -289,41 +234,12 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
           </button>
         </div>
 
-        {/* Seletor de Abas: Excel vs Manual */}
-        <div className="flex border-b border-[#1E2A3F]/15 bg-white px-6 pt-3 gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('excel')}
-            className={`flex items-center gap-2 px-4 py-2.5 font-mono text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'excel'
-                ? 'border-[#123C6B] text-[#123C6B] bg-[#FBF9F2] rounded-t-lg'
-                : 'border-transparent text-[#64748B] hover:text-[#123C6B]'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-[#15803D]" />
-            <span>Planilha Excel (Recomendado)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('manual')}
-            className={`flex items-center gap-2 px-4 py-2.5 font-mono text-xs font-bold border-b-2 transition-all cursor-pointer ${
-              activeTab === 'manual'
-                ? 'border-[#123C6B] text-[#123C6B] bg-[#FBF9F2] rounded-t-lg'
-                : 'border-transparent text-[#64748B] hover:text-[#123C6B]'
-            }`}
-          >
-            <Building2 className="w-4 h-4 text-[#A9834C]" />
-            <span>Formulário Manual</span>
-          </button>
-        </div>
-
-        <div className="p-4 sm:p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 max-h-[80vh] overflow-y-auto">
           {/* Banner Informativo sobre a Regra de Ouro */}
           <div className="bg-[#123C6B]/10 border border-[#123C6B]/20 rounded-xl p-3.5 text-xs text-[#123C6B] flex items-start gap-2.5 leading-relaxed">
             <Info className="w-4 h-4 text-[#123C6B] flex-shrink-0 mt-0.5" />
             <div>
-              <strong>Segurança e Histórico Perpétuo:</strong> O envio de um novo mês cria registros isolados e <strong>jamais apaga visitas passadas</strong> (Outubro, Setembro, etc. continuam salvos no banco e acessíveis na navegação mensal).
+              <strong>Regra de Preservação e Limpeza:</strong> Ao virar o mês, a nova escala inicia com <strong>todas as vagas abertas</strong> e os <strong>resumos de visita em branco na tela</strong>. As visitas dos meses anteriores permanecem gravadas permanentemente no banco de dados para consulta a qualquer momento.
             </div>
           </div>
 
@@ -334,365 +250,181 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
             </div>
           )}
 
-          {/* ======================================================== */}
-          {/* ABA 1: IMPORTAÇÃO POR PLANILHA EXCEL                    */}
-          {/* ======================================================== */}
-          {activeTab === 'excel' && (
-            <div className="space-y-5">
-              {/* Passo 1: Baixar Modelo Oficial */}
-              <div className="bg-white p-4 rounded-xl border border-[#1E2A3F]/15 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-serif font-bold text-sm text-[#123C6B] flex items-center gap-1.5">
-                    <Download className="w-4 h-4 text-[#15803D]" />
-                    <span>Passo 1: Baixar Planilha Modelo Oficial</span>
-                  </h4>
-                  <p className="text-xs text-[#64748B] mt-0.5">
-                    Colunas padronizadas (`Data`, `Horário`, `Instituição`, `Endereço`, `Voluntários`).
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => downloadExcelTemplate(targetYearMonth)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-mono text-xs font-bold bg-[#F0FDF4] hover:bg-[#DCFCE7] text-[#166534] border border-[#86EFAC] transition-all cursor-pointer whitespace-nowrap shadow-2xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Baixar Modelo (.xlsx)</span>
-                </button>
-              </div>
+          {/* Seleção do Mês de Destino */}
+          <div className="bg-white p-4 rounded-xl border border-[#1E2A3F]/15 shadow-2xs">
+            <label className="block text-xs font-mono font-bold uppercase tracking-wider text-[#123C6B] mb-1.5">
+              📅 Mês e Ano da Nova Escala:
+            </label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <input
+                type="month"
+                value={targetYearMonth}
+                onChange={handleYearMonthChange}
+                required
+                className="bg-[#FBF9F2] border border-[#A9834C]/50 rounded-lg px-3 py-2 text-sm font-mono font-bold text-[#123C6B] outline-none cursor-pointer focus:border-[#123C6B] shadow-2xs"
+              />
+              <span className="font-serif italic text-base text-[#123C6B] font-semibold">
+                {formatMonthYearBr(targetYearMonth)}
+              </span>
+            </div>
+          </div>
 
-              {/* Passo 2: Upload da Planilha Preenchida */}
-              <div className="space-y-2">
-                <label className="block text-xs font-mono font-bold uppercase tracking-wider text-[#123C6B]">
-                  📤 Passo 2: Subir Planilha Preenchida
-                </label>
+          {/* Lista de Locais para o Novo Mês */}
+          <div className="space-y-3.5">
+            <div className="flex items-center justify-between">
+              <h4 className="font-serif font-bold text-base text-[#123C6B] flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-[#A9834C]" />
+                <span>Locais e Horários da Escala ({venues.length})</span>
+              </h4>
+              <button
+                type="button"
+                onClick={handleAddVenue}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-[#123C6B] text-[#123C6B] font-mono text-xs font-semibold hover:bg-[#123C6B]/10 cursor-pointer transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Adicionar Local</span>
+              </button>
+            </div>
 
+            {venues.map((venue, idx) => {
+              const weekday = getWeekdayName(venue.date);
+
+              return (
                 <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={() => setIsDragging(false)}
-                  onDrop={handleDropFile}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
-                    isDragging
-                      ? 'border-[#15803D] bg-[#F0FDF4]'
-                      : 'border-[#123C6B]/30 hover:border-[#123C6B] bg-white hover:bg-[#FBF9F2]'
-                  }`}
+                  key={idx}
+                  className="bg-white border border-[#1E2A3F]/15 rounded-xl p-3.5 sm:p-4 shadow-2xs relative space-y-3"
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx, .xls, .csv"
-                    onChange={handleFileInputChange}
-                    className="hidden"
-                  />
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <div className="w-12 h-12 rounded-full bg-[#123C6B]/10 flex items-center justify-center text-[#123C6B]">
-                      <Upload className="w-6 h-6" />
-                    </div>
-                    {isParsingExcel ? (
-                      <span className="font-mono text-xs font-bold text-[#123C6B]">
-                        Lendo e validando planilha...
+                  <div className="flex items-center justify-between border-b border-dashed border-[#1E2A3F]/15 pb-2">
+                    <span className="font-mono text-xs font-bold text-[#123C6B] bg-[#FBF9F2] px-2 py-0.5 rounded border border-[#123C6B]/20">
+                      #{idx + 1}
+                    </span>
+
+                    {/* Sugestões Rápidas de Hospitais */}
+                    <div className="flex items-center gap-1 overflow-x-auto max-w-[280px] sm:max-w-none py-0.5">
+                      <span className="text-[10px] font-mono text-[#A9834C] whitespace-nowrap flex items-center gap-0.5">
+                        <Sparkles className="w-3 h-3" /> Preencher:
                       </span>
-                    ) : (
-                      <>
-                        <span className="font-serif font-bold text-sm text-[#123C6B]">
-                          Clique para selecionar ou arraste o arquivo aqui
-                        </span>
-                        <span className="font-mono text-[11px] text-[#64748B]">
-                          Formatos aceitos: .xlsx, .xls, .csv
-                        </span>
-                      </>
-                    )}
+                      {HOSPITAL_PRESETS.map((p, pi) => (
+                        <button
+                          key={pi}
+                          type="button"
+                          onClick={() => handleApplyPreset(idx, p)}
+                          className="text-[10px] font-mono bg-[#FBF9F2] hover:bg-[#123C6B] hover:text-white border border-[#A9834C]/30 px-1.5 py-0.5 rounded text-[#123C6B] whitespace-nowrap transition-colors cursor-pointer"
+                          title={p.name}
+                        >
+                          {p.name.split('–')[0].replace('Hospital ', '').replace('Clínica ', '').trim()}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveVenue(idx)}
+                      className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer transition-colors"
+                      title="Remover este local"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold">
+                        Nome da Instituição:
+                      </label>
+                      <input
+                        type="text"
+                        value={venue.name}
+                        onChange={(e) => handleVenueChange(idx, 'name', e.target.value)}
+                        placeholder="Ex: Clínica da Gávea"
+                        required
+                        className="w-full bg-[#FBF9F2] border border-[#1E2A3F]/20 rounded px-2.5 py-1.5 text-xs font-serif font-bold text-[#123C6B] outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold">
+                        Endereço Completo:
+                      </label>
+                      <input
+                        type="text"
+                        value={venue.addr}
+                        onChange={(e) => handleVenueChange(idx, 'addr', e.target.value)}
+                        placeholder="Rua, Número e Bairro"
+                        required
+                        className="w-full bg-[#FBF9F2] border border-[#1E2A3F]/20 rounded px-2.5 py-1.5 text-xs font-mono text-[#4A5568] outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-[#123C6B]" />
+                        <span>Data ({weekday || 'Dia'}):</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={venue.date}
+                        onChange={(e) => handleVenueChange(idx, 'date', e.target.value)}
+                        required
+                        className="w-full bg-[#FBF9F2] border border-[#A9834C]/40 rounded px-2 py-1.5 text-xs font-mono font-bold text-[#123C6B] outline-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-[#123C6B]" />
+                        <span>Horário:</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={venue.time}
+                        onChange={(e) => handleVenueChange(idx, 'time', e.target.value)}
+                        required
+                        className="w-full bg-[#FBF9F2] border border-[#A9834C]/40 rounded px-2 py-1.5 text-xs font-mono font-bold text-[#123C6B] outline-none cursor-pointer"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold">
+                        Vagas Abertas:
+                      </label>
+                      <select
+                        value={venue.slotCount}
+                        onChange={(e) => handleVenueChange(idx, 'slotCount', parseInt(e.target.value, 10))}
+                        className="w-full bg-[#FBF9F2] border border-[#1E2A3F]/20 rounded px-2 py-1.5 text-xs font-mono font-medium text-[#1E2A3F] outline-none cursor-pointer"
+                      >
+                        <option value={2}>2 vagas abertas</option>
+                        <option value={3}>3 vagas abertas</option>
+                        <option value={4}>4 vagas abertas</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Avisos e Erros de Validação da Planilha */}
-              {excelResult && (
-                <div className="space-y-3 animate-in fade-in duration-200">
-                  {excelResult.errors.length > 0 && (
-                    <div className="bg-red-50 border border-red-300 text-red-800 p-3.5 rounded-xl text-xs space-y-1 font-mono">
-                      <strong className="flex items-center gap-1.5 text-red-700">
-                        <AlertCircle className="w-4 h-4" /> Erros encontrados na planilha:
-                      </strong>
-                      <ul className="list-disc pl-5 space-y-0.5">
-                        {excelResult.errors.map((err, ei) => (
-                          <li key={ei}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {excelResult.warnings.length > 0 && (
-                    <div className="bg-amber-50 border border-amber-300 text-amber-900 p-3.5 rounded-xl text-xs space-y-1 font-mono">
-                      <strong className="flex items-center gap-1.5 text-amber-800">
-                        <Info className="w-4 h-4" /> Observações automáticas:
-                      </strong>
-                      <ul className="list-disc pl-5 space-y-0.5">
-                        {excelResult.warnings.map((warn, wi) => (
-                          <li key={wi}>{warn}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Pré-visualização das Visitas da Planilha */}
-                  {excelResult.visits.length > 0 && (
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-serif font-bold text-sm text-[#123C6B] flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4 text-[#15803D]" />
-                          <span>
-                            Visitas Identificadas ({excelResult.visits.length}) — {formatMonthYearBr(excelResult.targetYearMonth || targetYearMonth)}
-                          </span>
-                        </h4>
-                        <span className="text-[11px] font-mono text-[#15803D] font-bold bg-[#DCFCE7] px-2 py-0.5 rounded">
-                          ✅ Pronto para Enviar
-                        </span>
-                      </div>
-
-                      <div className="bg-white border border-[#1E2A3F]/15 rounded-xl overflow-hidden shadow-2xs divide-y divide-[#E2E8F0] max-h-[220px] overflow-y-auto">
-                        {excelResult.visits.map((v, vi) => {
-                          const confirmados = (v.slots || []).filter((s) => (s || '').trim());
-                          const abertas = (v.slots || []).length - confirmados.length;
-
-                          return (
-                            <div key={vi} className="p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <div className="font-bold text-[#123C6B] font-serif text-sm">
-                                  {v.name}
-                                </div>
-                                <div className="text-[#64748B] text-[11px] font-mono mt-0.5">
-                                  🗓️ {formatDateBr(v.date)} às {v.time} • 📍 {v.addr}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {confirmados.length > 0 && (
-                                  <span className="bg-[#DEE9E2] text-[#224A3E] font-mono font-semibold px-2 py-0.5 rounded text-[11px]">
-                                    {confirmados.join(', ')}
-                                  </span>
-                                )}
-                                {abertas > 0 && (
-                                  <span className="bg-[#F4E2DE] text-[#8C281F] font-mono italic px-2 py-0.5 rounded text-[11px]">
-                                    {abertas} vaga(s) aberta(s)
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Botões do Rodapé para a Planilha Excel */}
-              <div className="pt-4 border-t border-[#1E2A3F]/15 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-full font-mono text-xs font-semibold text-[#4A5568] hover:bg-black/5 cursor-pointer transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmExcelRollover}
-                  disabled={isSubmitting || !excelResult || excelResult.visits.length === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#15803D] to-[#166534] text-white border border-[#14532D] shadow-md hover:brightness-105 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Check className="w-4 h-4 text-white" />
-                  <span>
-                    Publicar Escala da Planilha ({excelResult?.visits.length || 0} visitas)
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ======================================================== */}
-          {/* ABA 2: FORMULÁRIO MANUAL (CONTINGÊNCIA)                 */}
-          {/* ======================================================== */}
-          {activeTab === 'manual' && (
-            <form onSubmit={handleManualSubmit} className="space-y-4">
-              <div className="bg-white p-4 rounded-xl border border-[#1E2A3F]/15 shadow-2xs">
-                <label className="block text-xs font-mono font-bold uppercase tracking-wider text-[#123C6B] mb-1.5">
-                  📅 Mês e Ano da Nova Escala:
-                </label>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <input
-                    type="month"
-                    value={targetYearMonth}
-                    onChange={handleYearMonthChange}
-                    required
-                    className="bg-[#FBF9F2] border border-[#A9834C]/50 rounded-lg px-3 py-2 text-sm font-mono font-bold text-[#123C6B] outline-none cursor-pointer focus:border-[#123C6B] shadow-2xs"
-                  />
-                  <span className="font-serif italic text-base text-[#123C6B] font-semibold">
-                    {formatMonthYearBr(targetYearMonth)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Lista de Locais para o Novo Mês */}
-              <div className="space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-serif font-bold text-base text-[#123C6B] flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-[#A9834C]" />
-                    <span>Locais e Horários da Escala ({venues.length})</span>
-                  </h4>
-                  <button
-                    type="button"
-                    onClick={handleAddVenue}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-[#123C6B] text-[#123C6B] font-mono text-xs font-semibold hover:bg-[#123C6B]/10 cursor-pointer transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Adicionar Local</span>
-                  </button>
-                </div>
-
-                {venues.map((venue, idx) => {
-                  const weekday = getWeekdayName(venue.date);
-
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white border border-[#1E2A3F]/15 rounded-xl p-3.5 sm:p-4 shadow-2xs relative space-y-3"
-                    >
-                      <div className="flex items-center justify-between border-b border-dashed border-[#1E2A3F]/15 pb-2">
-                        <span className="font-mono text-xs font-bold text-[#123C6B] bg-[#FBF9F2] px-2 py-0.5 rounded border border-[#123C6B]/20">
-                          #{idx + 1}
-                        </span>
-
-                        <div className="flex items-center gap-1 overflow-x-auto max-w-[280px] sm:max-w-none py-0.5">
-                          <span className="text-[10px] font-mono text-[#A9834C] whitespace-nowrap flex items-center gap-0.5">
-                            <Sparkles className="w-3 h-3" /> Preencher:
-                          </span>
-                          {HOSPITAL_PRESETS.map((p, pi) => (
-                            <button
-                              key={pi}
-                              type="button"
-                              onClick={() => handleApplyPreset(idx, p)}
-                              className="text-[10px] font-mono bg-[#FBF9F2] hover:bg-[#123C6B] hover:text-white border border-[#A9834C]/30 px-1.5 py-0.5 rounded text-[#123C6B] whitespace-nowrap transition-colors cursor-pointer"
-                              title={p.name}
-                            >
-                              {p.name.split('–')[0].replace('Hospital ', '').replace('Clínica ', '').trim()}
-                            </button>
-                          ))}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVenue(idx)}
-                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer transition-colors"
-                          title="Remover este local"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold">
-                            Nome da Instituição:
-                          </label>
-                          <input
-                            type="text"
-                            value={venue.name}
-                            onChange={(e) => handleVenueChange(idx, 'name', e.target.value)}
-                            placeholder="Ex: Clínica da Gávea"
-                            required
-                            className="w-full bg-[#FBF9F2] border border-[#1E2A3F]/20 rounded px-2.5 py-1.5 text-xs font-serif font-bold text-[#123C6B] outline-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold">
-                            Endereço Completo:
-                          </label>
-                          <input
-                            type="text"
-                            value={venue.addr}
-                            onChange={(e) => handleVenueChange(idx, 'addr', e.target.value)}
-                            placeholder="Rua, Número e Bairro"
-                            required
-                            className="w-full bg-[#FBF9F2] border border-[#1E2A3F]/20 rounded px-2.5 py-1.5 text-xs font-mono text-[#4A5568] outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-[#123C6B]" />
-                            <span>Data ({weekday || 'Dia'}):</span>
-                          </label>
-                          <input
-                            type="date"
-                            value={venue.date}
-                            onChange={(e) => handleVenueChange(idx, 'date', e.target.value)}
-                            required
-                            className="w-full bg-[#FBF9F2] border border-[#A9834C]/40 rounded px-2 py-1.5 text-xs font-mono font-bold text-[#123C6B] outline-none cursor-pointer"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-[#123C6B]" />
-                            <span>Horário:</span>
-                          </label>
-                          <input
-                            type="time"
-                            value={venue.time}
-                            onChange={(e) => handleVenueChange(idx, 'time', e.target.value)}
-                            required
-                            className="w-full bg-[#FBF9F2] border border-[#A9834C]/40 rounded px-2 py-1.5 text-xs font-mono font-bold text-[#123C6B] outline-none cursor-pointer"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-mono text-[#1E2A3F]/70 mb-1 font-semibold">
-                            Vagas Abertas:
-                          </label>
-                          <select
-                            value={venue.slotCount}
-                            onChange={(e) => handleVenueChange(idx, 'slotCount', parseInt(e.target.value, 10))}
-                            className="w-full bg-[#FBF9F2] border border-[#1E2A3F]/20 rounded px-2 py-1.5 text-xs font-mono font-medium text-[#1E2A3F] outline-none cursor-pointer"
-                          >
-                            <option value={2}>2 vagas abertas</option>
-                            <option value={3}>3 vagas abertas</option>
-                            <option value={4}>4 vagas abertas</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Botões de Ação do Rodapé */}
-              <div className="pt-4 border-t border-[#1E2A3F]/15 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-full font-mono text-xs font-semibold text-[#4A5568] hover:bg-black/5 cursor-pointer transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] border border-[#8A6A38] shadow-md hover:brightness-105 cursor-pointer transition-all disabled:opacity-50"
-                >
-                  <Check className="w-4 h-4 text-[#2A1F0A]" />
-                  <span>Confirmar e Iniciar Escala de {formatMonthYearBr(targetYearMonth)}</span>
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
+          {/* Botões de Ação do Rodapé */}
+          <div className="pt-4 border-t border-[#1E2A3F]/15 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-full font-mono text-xs font-semibold text-[#4A5568] hover:bg-black/5 cursor-pointer transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] border border-[#8A6A38] shadow-md hover:brightness-105 cursor-pointer transition-all disabled:opacity-50"
+            >
+              <Check className="w-4 h-4 text-[#2A1F0A]" />
+              <span>Confirmar e Iniciar Escala de {formatMonthYearBr(targetYearMonth)}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
