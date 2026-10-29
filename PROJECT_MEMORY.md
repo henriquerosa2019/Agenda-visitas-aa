@@ -178,4 +178,30 @@ git push origin main
 - **Origem:** No commit `7f7deb4`, o arquivo `initialData.ts` continha `['Marcio Motta', '', 'Roberto']` (vaga 2 aberta). Um usuário digitou "Roberto" na vaga aberta 2. Devido à ausência de validação na época, o banco salvou `["Marcio Motta", "Roberto", "Roberto"]`.
 - **Resolução:** O banco Supabase foi corrigido para `["Marcio Motta", "Roberto", ""]` (com a 3ª vaga aberta), a suíte de testes unitários foi adicionada em `tests/validation.test.mjs`, o relatório diário foi recalculado para 1 visita confirmada de Roberto e o deploy foi homologado e publicado na Vercel.
 
+---
+
+## 🗓️ Virada do Mês, Gestão de Locais & Histórico Perpétuo
+
+### 1. Regra de Virada do Mês (Month Rollover)
+- **Objetivo:** Permitir aos coordenadores iniciar a escala de um novo mês com facilidade e autonomia:
+  - **Limpeza de Tela:** Todas as vagas de voluntários iniciam abertas (`vaga aberta`), e os dados de resumo da visita (`visitSummary`, `completedBy`, `completedAt`, `isCompleted`) iniciam vazios/limpos.
+  - **Customização de Locais:** O modal `MonthRolloverModal` permite replicar os locais da escala anterior ou usar os presets dos hospitais parceiros de A.A., ajustando livremente as datas (dias do novo mês) e horários.
+  - **Isolamento de IDs:** Cada visita recebe um ID único baseado na data e timestamp (ex: `visit-2026-10-05-10h-...`), garantindo que nenhuma visita de um mês sobrescreva visitas de meses anteriores.
+
+### 2. Histórico Perpétuo no Banco de Dados (Supabase)
+- **Autoridade e Imutabilidade de Histórico:** As visitas de meses anteriores (como Setembro/2026 e Outubro/2026), com seus voluntários escalados, vagas e resumos de como foi a visita, **permanecem permanentemente gravadas no Supabase** (`aa_visits`).
+- **Navegação e Consulta Temporal:** A barra de navegação no topo da folha timbrada permite retroceder para qualquer mês passado (exibindo os relatos e voluntários da época) ou avançar para meses futuros.
+- **Relatórios Retroativos:** O script de análise diária (`scripts/analyze-visits.mjs`) aceita o parâmetro `--month=YYYY-MM` (ex: `node scripts/analyze-visits.mjs --month=2026-10`), permitindo auditar e emitir o relatório oficial consolidado de qualquer mês a qualquer tempo.
+
+### 3. Escala de Novembro/2026
+- **Cadastro no Banco:** 5 visitas programadas cadastradas com IDs isolados (`visit-2026-11-...`):
+  1. `09/11 às 10:00`: Clínica da Gávea – Unidade Tijuca (Danilo preenchido, 2 vagas abertas)
+  2. `09/11 às 16:00`: Hospital São Francisco na Providência de Deus (3 vagas abertas)
+  3. `16/11 às 17:00`: Clínica Evolução (3 vagas abertas)
+  4. `18/11 às 19:30`: Hospital Casa Menssana (3 vagas abertas)
+  5. `23/11 às 16:00`: Hospital São Francisco na Providência de Deus (3 vagas abertas)
+- **Coexistência:** O histórico completo de Outubro/2026 (5 visitas realizadas e relatos) permanece preservado e acessível na navegação de meses.
+
+
+
 

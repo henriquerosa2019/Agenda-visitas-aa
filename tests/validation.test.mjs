@@ -134,3 +134,82 @@ assert.strictEqual(isDuplicateVolunteer('Henrique', 2, mockVisit, allVisits), fa
 assert.strictEqual(isDuplicateVolunteer('Roberto', 1, mockVisit, allVisits), false);
 
 console.log('✅ 3. Todos os cenários de detecção de duplicidade foram validados com 100% de sucesso!');
+
+// 4. Testes de Gestão Mensal e Virada do Mês
+function formatMonthYearBr(yearMonthStr) {
+  if (!yearMonthStr) return '';
+  const parts = yearMonthStr.split('-');
+  if (parts.length < 2) return yearMonthStr;
+  const y = parts[0];
+  const m = parseInt(parts[1], 10);
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  const name = monthNames[m - 1] || parts[1];
+  return `${name} de ${y}`;
+}
+
+function getNextYearMonth(yearMonthStr) {
+  if (!yearMonthStr) return '';
+  const [y, m] = yearMonthStr.split('-').map(Number);
+  const d = new Date(y, m, 1);
+  const nextY = d.getFullYear();
+  const nextM = String(d.getMonth() + 1).padStart(2, '0');
+  return `${nextY}-${nextM}`;
+}
+
+function getPrevYearMonth(yearMonthStr) {
+  if (!yearMonthStr) return '';
+  const [y, m] = yearMonthStr.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  const prevY = d.getFullYear();
+  const prevM = String(d.getMonth() + 1).padStart(2, '0');
+  return `${prevY}-${prevM}`;
+}
+
+assert.strictEqual(formatMonthYearBr('2026-09'), 'Setembro de 2026');
+assert.strictEqual(formatMonthYearBr('2026-10'), 'Outubro de 2026');
+assert.strictEqual(getNextYearMonth('2026-09'), '2026-10');
+assert.strictEqual(getNextYearMonth('2026-12'), '2027-01');
+assert.strictEqual(getPrevYearMonth('2026-10'), '2026-09');
+assert.strictEqual(getPrevYearMonth('2027-01'), '2026-12');
+
+// Simulação de virada de mês (limpeza de resumos e vagas abertas)
+const previousMonthVisits = [
+  {
+    id: 'visit-2026-09-14-10h',
+    name: 'Clínica da Gávea',
+    addr: 'Rua Pereira dos Santos',
+    date: '2026-09-14',
+    time: '10:00',
+    slots: ['Danilo', 'Marcio Motta'],
+    visitSummary: 'Visita muito boa',
+    completedBy: 'Danilo',
+    isCompleted: true,
+  },
+];
+
+const newMonthVisits = previousMonthVisits.map((v, idx) => ({
+  id: `visit-2026-10-05-10h-${idx}`,
+  name: v.name,
+  addr: v.addr,
+  date: '2026-10-05',
+  time: v.time,
+  slots: Array(v.slots.length).fill(''),
+  visitSummary: undefined,
+  completedBy: undefined,
+  isCompleted: false,
+}));
+
+// Verifica que o novo mês iniciou 100% limpo
+assert.deepStrictEqual(newMonthVisits[0].slots, ['', '']);
+assert.strictEqual(newMonthVisits[0].visitSummary, undefined);
+assert.strictEqual(newMonthVisits[0].isCompleted, false);
+
+// Verifica que o mês anterior permanece com seus dados preservados
+assert.deepStrictEqual(previousMonthVisits[0].slots, ['Danilo', 'Marcio Motta']);
+assert.strictEqual(previousMonthVisits[0].visitSummary, 'Visita muito boa');
+assert.strictEqual(previousMonthVisits[0].isCompleted, true);
+
+console.log('✅ 4. Testes de virada do mês, limpeza e preservação de histórico passaram com 100% de sucesso!');

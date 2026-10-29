@@ -20,6 +20,7 @@ interface EditVisitModalProps {
   onClose: () => void;
   onSave: (visit: VisitItem) => void;
   initialVisit?: VisitItem | null;
+  defaultMonth?: string;
 }
 
 export const EditVisitModal: React.FC<EditVisitModalProps> = ({
@@ -27,6 +28,7 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
   onClose,
   onSave,
   initialVisit,
+  defaultMonth,
 }) => {
   const [name, setName] = useState('');
   const [addr, setAddr] = useState('');
@@ -50,13 +52,18 @@ export const EditVisitModal: React.FC<EditVisitModalProps> = ({
       setName('');
       setAddr('');
       const todayStr = new Date().toISOString().slice(0, 10);
-      setDate(todayStr);
+      let initialDate = todayStr;
+      if (defaultMonth && !todayStr.startsWith(defaultMonth)) {
+        initialDate = `${defaultMonth}-05`;
+      }
+      setDate(initialDate);
       setTime('16:00');
       setSlots(['', '', '']);
       setNotes('');
     }
     setError('');
-  }, [initialVisit, isOpen]);
+  }, [initialVisit, isOpen, defaultMonth]);
+
 
   if (!isOpen) return null;
 

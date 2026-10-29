@@ -7,11 +7,15 @@ import {
   getVisitStatus,
   formatFullDateBr,
   formatTimeBr,
+  formatMonthYearBr,
+  getAvailableMonths,
+  getYearMonth,
 } from './types';
 import { INITIAL_AGENDA } from './data/initialData';
 import { AALogo } from './components/AALogo';
 import { EditVisitModal } from './components/EditVisitModal';
 import { VisitSummaryModal } from './components/VisitSummaryModal';
+import { MonthRolloverModal } from './components/MonthRolloverModal';
 import {
   getSupabaseClient,
   fetchVisitsFromSupabase,
@@ -35,20 +39,30 @@ import {
   Download,
   Share,
   X,
+  ChevronLeft,
+  ChevronRight,
+  CalendarDays,
 } from 'lucide-react';
 
-const CURRENT_STORAGE_KEY = 'escala_visitas_aa_data_v9';
+const CURRENT_STORAGE_KEY = 'escala_visitas_aa_data_v10';
+
 
 type SyncStatus = 'idle' | 'syncing' | 'connected' | 'error' | 'offline';
 
 export default function App() {
+  const getTodayYearMonth = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+
   const [state, setState] = useState<AgendaData>(() => {
-    // Limpeza de chaves antigas de teste do navegador
+    // Limpeza de chaves legadas de teste do navegador
     try {
       localStorage.removeItem('escala_visitas_aa_data_v5');
       localStorage.removeItem('escala_visitas_aa_data_v6');
       localStorage.removeItem('escala_visitas_aa_data_v7');
       localStorage.removeItem('escala_visitas_aa_data_v8');
+      localStorage.removeItem('escala_visitas_aa_data_v9');
     } catch (e) {}
 
     try {
@@ -56,23 +70,10 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed.visits) && parsed.visits.length > 0) {
-          const cleanedVisits = parsed.visits.map((v: VisitItem) => {
-            const cleanSlots = sanitizeSlots(v.slots || []);
-            if (v.id === 'sept-14-10h' || v.name.toLowerCase().includes('gávea')) {
-              return {
-                ...v,
-                slots: cleanSlots,
-                visitSummary: undefined,
-                completedBy: undefined,
-                completedAt: undefined,
-                isCompleted: false,
-              };
-            }
-            return {
-              ...v,
-              slots: cleanSlots,
-            };
-          });
+          const cleanedVisits = parsed.visits.map((v: VisitItem) => ({
+            ...v,
+            slots: sanitizeSlots(v.slots || []),
+          }));
           return {
             groupName: parsed.groupName || INITIAL_AGENDA.groupName,
             objective: parsed.objective || INITIAL_AGENDA.objective,
@@ -86,9 +87,16 @@ export default function App() {
     return INITIAL_AGENDA;
   });
 
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    return getTodayYearMonth();
+  });
+
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [selectedVisit, setSelectedVisit] = useState<VisitItem | null>(null);
+
+  // Modal de Virada de Mês (Nova Escala)
+  const [rolloverModalOpen, setRolloverModalOpen] = useState<boolean>(false);
 
   // Modal de Resumo da Visita
   const [summaryModalOpen, setSummaryModalOpen] = useState<boolean>(false);
@@ -103,6 +111,7 @@ export default function App() {
 
   // Toast de feedback visual após salvar
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
 
   // Estados para instalação PWA (ícone na tela do celular)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -201,7 +210,33 @@ export default function App() {
           visits: sortVisitsAscending(cleanVisits),
         }));
 
+        setSelectedMonth((curr) => {
+          const todayIso = new Date().toISOString().slice(0, 10);
+          const hasFutureOrTodayInCurr = cleanVisits.some(
+            (v) => v.date && v.date.startsWith(curr) && v.date >= todayIso
+          );
+          if (hasFutureOrTodayInCurr) return curr;
+
+          // Se todas as visitas do mês atual já passaram, abre automaticamente no próximo mês com escala ativa
+          const nextActiveVisit = cleanVisits.find((v) => v.date && v.date >= todayIso);
+          if (nextActiveVisit && nextActiveVisit.date) {
+            return nextActiveVisit.date.slice(0, 7);
+          }
+
+          const hasInCurr = cleanVisits.some((v) => v.date && v.date.startsWith(curr));
+          if (hasInCurr) return curr;
+          const monthsWithVisits = Array.from(
+            new Set(cleanVisits.map((v) => (v.date ? v.date.slice(0, 7) : '')).filter(Boolean))
+          ).sort();
+          if (monthsWithVisits.length > 0) {
+            const nextOrToday = monthsWithVisits.find((m) => m >= curr);
+            return nextOrToday || monthsWithVisits[monthsWithVisits.length - 1];
+          }
+          return curr;
+        });
+
         setSyncStatus('connected');
+
       }
     } catch (err) {
       console.error('[Sync] Falha ao sincronizar com Supabase:', err);
@@ -254,6 +289,9 @@ export default function App() {
   };
 
   const sortedVisits = sortVisitsAscending(state.visits);
+  const currentMonthVisits = sortedVisits.filter(
+    (v) => v.date && v.date.startsWith(selectedMonth)
+  );
 
   const toggleEdit = () => {
     if (isEditing) {
@@ -292,6 +330,38 @@ export default function App() {
     setSummaryModalOpen(true);
   };
 
+  const handleNavigateMonth = (direction: -1 | 1) => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const targetDate = new Date(y, m - 1 + direction, 1);
+    const targetYear = targetDate.getFullYear();
+    const targetMonth = String(targetDate.getMonth() + 1).padStart(2, '0');
+    setSelectedMonth(`${targetYear}-${targetMonth}`);
+  };
+
+  const handleConfirmRollover = async (newVisits: VisitItem[], targetYearMonth: string) => {
+    // Adiciona as novas visitas limpas preservando 100% dos meses anteriores no banco
+    setState((prev) => {
+      const otherMonthsVisits = prev.visits.filter((v) => !v.date.startsWith(targetYearMonth));
+      const combined = [...otherMonthsVisits, ...newVisits];
+      return {
+        ...prev,
+        visits: sortVisitsAscending(combined),
+      };
+    });
+
+    setSelectedMonth(targetYearMonth);
+
+    // Persistir novas visitas no Supabase
+    const client = getSupabaseClient();
+    if (client) {
+      setSyncStatus('syncing');
+      const success = await bulkUpsertVisits(newVisits);
+      setSyncStatus(success ? 'connected' : 'error');
+    }
+
+    showToast(`🎉 Escala de ${formatMonthYearBr(targetYearMonth)} iniciada com sucesso! Vagas abertas para novos voluntários.`);
+  };
+
   const handleSaveModalVisit = (visit: VisitItem) => {
     const cleanVisit: VisitItem = {
       ...visit,
@@ -312,10 +382,19 @@ export default function App() {
       };
     });
 
+    // Se o usuário alterou ou criou visita em outro mês, ajusta a visualização para o mês da visita
+    if (cleanVisit.date && cleanVisit.date.length >= 7) {
+      const vMonth = cleanVisit.date.slice(0, 7);
+      if (vMonth !== selectedMonth) {
+        setSelectedMonth(vMonth);
+      }
+    }
+
     // Gravar no Supabase (o trigger PostgreSQL envia e-mails se houver novos voluntários)
     persistVisit(cleanVisit);
     showToast('✅ Dados do local e voluntários salvos com sucesso!');
   };
+
 
   const handleSaveVisitSummary = (
     visitId: string,
@@ -659,9 +738,86 @@ export default function App() {
           </p>
         </header>
 
+        {/* Barra de Navegação Mensal e Ação de Virada de Mês */}
+        <div className="bg-[#123C6B] text-white rounded-xl p-3 sm:p-4 mb-6 shadow-md border border-[#E4C687]/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+            <button
+              type="button"
+              onClick={() => handleNavigateMonth(-1)}
+              className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-mono text-xs flex items-center gap-1 transition-colors cursor-pointer select-none"
+              title="Ver mês anterior"
+            >
+              <ChevronLeft className="w-4 h-4 text-[#F6D269]" />
+              <span className="hidden sm:inline">Mês Anterior</span>
+            </button>
+
+            <div className="text-center px-2">
+              <div className="flex items-center justify-center gap-2">
+                <Calendar className="w-4 h-4 text-[#F6D269]" />
+                <h2 className="font-serif font-bold text-lg sm:text-xl text-[#F6D269] tracking-tight">
+                  {formatMonthYearBr(selectedMonth)}
+                </h2>
+              </div>
+              <div className="text-[10.5px] font-mono text-white/80 mt-0.5">
+                {selectedMonth < getTodayYearMonth() ? (
+                  <span className="text-amber-200">📜 Histórico de Visitas Realizadas</span>
+                ) : selectedMonth === getTodayYearMonth() ? (
+                  <span className="text-emerald-300 font-semibold">🟢 Escala do Mês Atual</span>
+                ) : (
+                  <span className="text-sky-200">🗓️ Próxima Escala Planejada</span>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleNavigateMonth(1)}
+              className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-mono text-xs flex items-center gap-1 transition-colors cursor-pointer select-none"
+              title="Ver próximo mês"
+            >
+              <span className="hidden sm:inline">Próximo Mês</span>
+              <ChevronRight className="w-4 h-4 text-[#F6D269]" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={() => setRolloverModalOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] border border-[#8A6A38] shadow-md hover:brightness-105 transition-all cursor-pointer"
+              title="Virar o mês e planejar nova escala com vagas e resumos limpos"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-[#2A1F0A]" />
+              <span>Virar Mês / Nova Escala</span>
+            </button>
+          </div>
+        </div>
+
         {/* Lista de Locais e Visitas */}
         <main className="space-y-5 sm:space-y-6">
-          {sortedVisits.map((visit) => {
+          {currentMonthVisits.length === 0 ? (
+            <div className="bg-white border border-[#1E2A3F]/15 rounded-xl p-6 sm:p-8 text-center shadow-xs my-4 space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#123C6B]/10 flex items-center justify-center mx-auto text-[#123C6B]">
+                <CalendarDays className="w-6 h-6 text-[#123C6B]" />
+              </div>
+              <h3 className="font-serif font-bold text-lg text-[#123C6B]">
+                Nenhuma visita cadastrada para {formatMonthYearBr(selectedMonth)}
+              </h3>
+              <p className="text-xs font-mono text-[#4A5568] max-w-md mx-auto leading-relaxed">
+                Deseja iniciar a escala deste mês a partir dos locais habituais com todas as vagas abertas e resumos limpos na tela?
+              </p>
+              <button
+                type="button"
+                onClick={() => setRolloverModalOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] border border-[#8A6A38] shadow-md hover:brightness-105 cursor-pointer transition-all"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Iniciar Escala de {formatMonthYearBr(selectedMonth)}</span>
+              </button>
+            </div>
+          ) : (
+            currentMonthVisits.map((visit) => {
+
             const status = getVisitStatus(visit.date, visit.isCompleted);
             const isPast = status === 'past';
 
@@ -905,8 +1061,9 @@ export default function App() {
                 )}
               </section>
             );
-          })}
+          }))}
         </main>
+
 
         {/* Botão Novo Local de Visita */}
         <div className="mt-6 mb-8">
@@ -944,6 +1101,16 @@ export default function App() {
         onClose={() => setModalOpen(false)}
         onSave={handleSaveModalVisit}
         initialVisit={selectedVisit}
+        defaultMonth={selectedMonth}
+      />
+
+      {/* Modal para Virada de Mês / Nova Escala */}
+      <MonthRolloverModal
+        isOpen={rolloverModalOpen}
+        onClose={() => setRolloverModalOpen(false)}
+        onConfirm={handleConfirmRollover}
+        currentYearMonth={selectedMonth}
+        existingVisits={state.visits}
       />
 
       {/* Modal para Resumo da Visita */}
@@ -953,6 +1120,7 @@ export default function App() {
         onSaveSummary={handleSaveVisitSummary}
         visit={summaryVisit}
       />
+
 
       {/* Modal / Guia de Instalação do App no Celular */}
       {showInstallGuide && (

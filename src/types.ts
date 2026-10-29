@@ -60,6 +60,55 @@ export function formatFullDateBr(dateStr: string): string {
   return `${dd}/${mm}/${y}`;
 }
 
+export function getYearMonth(dateStr: string): string {
+  if (!dateStr || dateStr.length < 7) return '';
+  return dateStr.slice(0, 7);
+}
+
+export function formatMonthYearBr(yearMonthStr: string): string {
+  if (!yearMonthStr) return '';
+  const parts = yearMonthStr.split('-');
+  if (parts.length < 2) return yearMonthStr;
+  const y = parts[0];
+  const m = parseInt(parts[1], 10);
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  const name = monthNames[m - 1] || parts[1];
+  return `${name} de ${y}`;
+}
+
+export function getAvailableMonths(visits: VisitItem[], currentMonthYear?: string): string[] {
+  const months = new Set<string>();
+  if (currentMonthYear) months.add(currentMonthYear);
+  for (const v of visits) {
+    if (v.date && v.date.length >= 7) {
+      months.add(v.date.slice(0, 7));
+    }
+  }
+  return Array.from(months).sort();
+}
+
+export function getNextYearMonth(yearMonthStr: string): string {
+  if (!yearMonthStr) return '';
+  const [y, m] = yearMonthStr.split('-').map(Number);
+  const d = new Date(y, m, 1); // m is 1-based, new Date(y, m, 1) goes to next month
+  const nextY = d.getFullYear();
+  const nextM = String(d.getMonth() + 1).padStart(2, '0');
+  return `${nextY}-${nextM}`;
+}
+
+export function getPrevYearMonth(yearMonthStr: string): string {
+  if (!yearMonthStr) return '';
+  const [y, m] = yearMonthStr.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  const prevY = d.getFullYear();
+  const prevM = String(d.getMonth() + 1).padStart(2, '0');
+  return `${prevY}-${prevM}`;
+}
+
+
 export function formatTimeBr(timeStr: string): string {
   if (!timeStr) return '';
   const [h, m] = timeStr.split(':');

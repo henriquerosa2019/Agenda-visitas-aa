@@ -34,11 +34,13 @@ function formatVolunteerDisplayName(name) {
   const cleaned = name
     .trim()
     .replace(/[._\-]+/g, ' ')
-    .replace(/\s+/g, ' ');
+    .replace(/\s+/g, ' ')
+    .trim();
 
   return cleaned
     .split(' ')
-    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ''))
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
 }
 
@@ -290,6 +292,26 @@ async function sendReportEmail({
         .join('')
     : '<p style="color: #64748B; font-style: italic;">Nenhum local com agendamento confirmado no momento.</p>';
 
+  const relatosConcluidosHtml = visitasComResumo.length
+    ? `
+      <div style="background-color: #F0FDF4; border-left: 4px solid #16A34A; padding: 12px 16px; margin-top: 10px; border-radius: 4px;">
+        <p style="margin: 0 0 8px 0; font-weight: bold; color: #166534; font-size: 13px;">✅ Relatos de Visitas Já Realizadas:</p>
+        ${visitasComResumo
+          .map((v) => {
+            const confirmados = getConfirmedVolunteers(v.slots);
+            return `
+              <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #BBF7D0; font-size: 13px; color: #14532D;">
+                <div style="font-weight: bold; color: #123C6B;">🏥 ${v.name}</div>
+                <div style="font-size: 12px; color: #475569; margin: 2px 0;">🗓️ ${formatBrDate(v.date)} às ${v.time} | 👥 Voluntários: <strong>${confirmados.join(', ') || 'Não registrado'}</strong></div>
+                ${v.visit_summary ? `<div style="font-style: italic; color: #1E293B; background: #FFFFFF; padding: 8px 10px; border-radius: 4px; margin-top: 4px; border: 1px solid #DCFCE7;">“${v.visit_summary.trim()}”</div>` : ''}
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+    `
+    : '';
+
   const pendenciasHtml = visitasSemResumo.length
     ? `<div style="background-color: #FEF2F2; border-left: 4px solid #EF4444; padding: 12px 16px; margin-top: 10px; border-radius: 4px;">
         <p style="margin: 0 0 6px 0; font-weight: bold; color: #B91C1C; font-size: 13px;">⚠️ Visitas pendentes de relato:</p>
@@ -400,6 +422,7 @@ async function sendReportEmail({
             <td style="padding: 6px 0; font-weight: bold; text-align: right; color: ${visitasSemResumo.length ? '#B91C1C' : '#475569'};">${visitasSemResumo.length}</td>
           </tr>
         </table>
+        ${relatosConcluidosHtml}
         ${pendenciasHtml}
       </div>
 
@@ -799,8 +822,36 @@ export async function runVisitsAnalysis() {
     return;
   }
 
-  // Métricas
-  const totalVisitas = visits.length;
+  // Parâmetros de filtro mensal: --month=YYYY-MM ou --all
+  const monthArg = process.argv.find((a) => a.startsWith('--month='));
+  const allMonthsArg = process.argv.includes('--all') || process.argv.includes('--todos-os-meses');
+  let targetYearMonth = monthArg ? monthArg.split('=')[1].trim() : '';
+
+  if (!targetYearMonth && !allMonthsArg) {
+    targetYearMonth = yearMonth; // Padrão: mês corrente (ex: 2026-09 ou 2026-10)
+    const hasCurrentVisits = visits.some((v) => v.date && v.date.startsWith(targetYearMonth));
+    if (!hasCurrentVisits) {
+      const nextVisit = visits.find((v) => v.date && v.date > todayStr);
+      if (nextVisit && nextVisit.date) {
+        targetYearMonth = nextVisit.date.slice(0, 7);
+      }
+    }
+  }
+
+  const targetVisits = targetYearMonth
+    ? visits.filter((v) => v.date && v.date.startsWith(targetYearMonth))
+    : visits;
+
+  const targetMonthNum = targetYearMonth ? parseInt(targetYearMonth.split('-')[1], 10) : month;
+  const targetYearNum = targetYearMonth ? parseInt(targetYearMonth.split('-')[0], 10) : year;
+  const targetMonthName = getPortugueseMonthName(targetMonthNum);
+
+  if (targetYearMonth) {
+    console.log(`  📅 Escopo do Relatório: ${targetMonthName}/${targetYearNum}`);
+  }
+
+  // Métricas do escopo analisado
+  const totalVisitas = targetVisits.length;
   let visitasPassadas = 0;
   let visitasHoje = 0;
   let visitasFuturas = 0;
@@ -813,10 +864,10 @@ export async function runVisitsAnalysis() {
   const voluntarioAgg = {};
   const visitasSemResumo = [];
   const visitasComResumo = [];
-  const visitasDeHoje = [];
-  const visitasFuturasList = [];
+  const visitasDeHoje = visits.filter((v) => v.date === todayStr);
+  const visitasFuturasList = visits.filter((v) => v.date > todayStr);
 
-  for (const v of visits) {
+  for (const v of targetVisits) {
     const rawSlots = Array.isArray(v.slots) ? v.slots : [];
     totalVagasOfertadas += rawSlots.length;
 
@@ -855,14 +906,13 @@ export async function runVisitsAnalysis() {
       }
     } else if (v.date === todayStr) {
       visitasHoje++;
-      visitasDeHoje.push(v);
     } else {
       visitasFuturas++;
-      visitasFuturasList.push(v);
     }
   }
 
   const proximaVisita = visitasFuturasList.length > 0
+
     ? visitasFuturasList.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))[0]
     : null;
 
@@ -922,10 +972,11 @@ export async function runVisitsAnalysis() {
   }
 
   // Filtrar locais que possuem pelo menos 1 voluntário agendado
-  const visitasComVoluntarios = visits.filter((v) => {
+  const visitasComVoluntarios = targetVisits.filter((v) => {
     const slots = Array.isArray(v.slots) ? v.slots : [];
     return slots.some((s) => (s || '').trim());
   });
+
 
   console.log(`\n🏥 4. LOCAIS AGENDADOS:`);
   if (visitasComVoluntarios.length === 0) {
@@ -946,8 +997,19 @@ export async function runVisitsAnalysis() {
   console.log(`\n📝 5. STATUS DOS RESUMOS DE VISITAS REALIZADAS:`);
   console.log(`   • Visitas passadas com resumo registrado: ${visitasComResumo.length}`);
   console.log(`   • Visitas passadas com resumo PENDENTE:    ${visitasSemResumo.length}`);
+  if (visitasComResumo.length > 0) {
+    console.log(`\n   ✅ Detalhes das Visitas Realizadas:`);
+    visitasComResumo.forEach((v) => {
+      const confirmados = getConfirmedVolunteers(v.slots);
+      console.log(`      - Local: ${v.name} (${formatBrDate(v.date)} às ${v.time})`);
+      console.log(`        Voluntários: ${confirmados.join(', ') || 'Não registrado'}`);
+      if (v.visit_summary) {
+        console.log(`        Relato: "${v.visit_summary.trim()}"`);
+      }
+    });
+  }
   if (visitasSemResumo.length > 0) {
-    console.log(`     ⚠️ Pendências de relato:`);
+    console.log(`\n     ⚠️ Pendências de relato:`);
     visitasSemResumo.forEach((v) => {
       console.log(`       - [${formatBrDate(v.date)} às ${v.time}] ${v.name}`);
     });
@@ -958,13 +1020,13 @@ export async function runVisitsAnalysis() {
   console.log('='.repeat(68));
 
   // --- Fechamento e Parabenização de Final de Mês ---
-  const currentMonthNum = month;
-  const currentYearNum = year;
+  const currentMonthNum = targetMonthNum;
+  const currentYearNum = targetYearNum;
   const currentDayNum = day;
-  const currentMonthName = getPortugueseMonthName(currentMonthNum);
-  const currentYearMonth = yearMonth;
+  const currentMonthName = targetMonthName;
+  const currentYearMonth = targetYearMonth || yearMonth;
 
-  const visitsThisMonth = visits.filter((v) => v.date && v.date.startsWith(currentYearMonth));
+  const visitsThisMonth = targetVisits;
   const totalVisitasMes = visitsThisMonth.length;
   let totalVagasOfertadasMes = 0;
   let totalVagasPreenchidasMes = 0;
@@ -1016,18 +1078,21 @@ export async function runVisitsAnalysis() {
   const instituicoesMes = Array.from(instituicoesMesSet);
 
   const lastDayOfCurrentMonth = new Date(currentYearNum, currentMonthNum, 0).getDate();
-  const isLastDayOfMonth = currentDayNum === lastDayOfCurrentMonth;
+  const isPastMonth = Boolean(targetYearMonth && targetYearMonth < yearMonth);
+  const isLastDayOfTarget = (targetYearMonth === yearMonth && day === lastDayOfCurrentMonth);
   const todasVisitasMesRealizadas =
     visitsThisMonth.length > 0 &&
     visitasHojeMes === 0 &&
     visitasFuturasMes === 0;
 
   const isEndOfMonth =
-    isLastDayOfMonth ||
-    (currentDayNum >= 28 && todasVisitasMesRealizadas) ||
+    isPastMonth ||
+    isLastDayOfTarget ||
+    (targetYearMonth === yearMonth && currentDayNum >= 28 && todasVisitasMesRealizadas) ||
     process.argv.includes('--end-of-month') ||
     process.argv.includes('--fim-de-mes') ||
     process.env.FORCE_MONTH_END === 'true';
+
 
   if (isEndOfMonth) {
     console.log(`\n🎉 ====================================================================`);
@@ -1125,8 +1190,21 @@ ${
 - **Com Resumo Registrado:** ${visitasComResumo.length}
 - **Com Resumo Pendente:** ${visitasSemResumo.length}
 ${
+  visitasComResumo.length
+    ? `\n### ✅ Visitas Já Realizadas (Com Relato Registrado):\n` +
+      visitasComResumo
+        .map((v) => {
+          const confirmados = getConfirmedVolunteers(v.slots);
+          const relato = v.visit_summary ? `\n  - **Relato da Visita:** "${v.visit_summary.trim()}"` : '';
+          return `- **Local:** ${v.name}\n  - **Dia:** ${formatBrDate(v.date)} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; **Hora:** ${v.time}\n  - **Voluntários:** ${confirmados.join(', ') || 'Não registrado'}${relato}`;
+        })
+        .join('\n\n')
+    : ''
+}
+${
   visitasSemResumo.length
-    ? visitasSemResumo.map((v) => `  - ⚠️ *[${formatBrDate(v.date)} às ${v.time}]* ${v.name}`).join('\n')
+    ? `\n### ⚠️ Visitas Passadas com Relato Pendente:\n` +
+      visitasSemResumo.map((v) => `  - ⚠️ *[${formatBrDate(v.date)} às ${v.time}]* ${v.name}`).join('\n')
     : ''
 }
 ${fimDeMesMarkdownSection}

@@ -8,7 +8,7 @@ echo   📊 EXECUTANDO ANÁLISE DE VISITAS A.A. — CTO / CIT
 echo ====================================================================
 echo.
 
-node --dns-result-order=ipv4first scripts/analyze-visits.mjs
+node --dns-result-order=ipv4first scripts/analyze-visits.mjs %*
 
 echo.
 echo ====================================================================
