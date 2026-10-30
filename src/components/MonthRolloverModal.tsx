@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VisitItem, formatMonthYearBr, getWeekdayName, getNextYearMonth } from '../types';
 import { HOSPITAL_PRESETS } from '../data/initialData';
+import { validateRolloverPassword } from '../lib/validation';
 import {
   CalendarDays,
   Plus,
@@ -13,6 +14,12 @@ import {
   Sparkles,
   Info,
   AlertCircle,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
+  ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface MonthRolloverModalProps {
@@ -45,10 +52,20 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
   const [error, setError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // Estados para trava de segurança por senha
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [authError, setAuthError] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+
   // Inicializa a lista de locais sugeridos quando o modal abre, replicando o mês anterior
   useEffect(() => {
     if (!isOpen) {
       setError('');
+      setIsUnlocked(false);
+      setPasswordInput('');
+      setAuthError('');
+      setShowPassword(false);
       return;
     }
 
@@ -153,8 +170,22 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
     setError('');
   };
 
+  const handleUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateRolloverPassword(passwordInput)) {
+      setIsUnlocked(true);
+      setAuthError('');
+    } else {
+      setAuthError('Senha incorreta! Acesso não autorizado para virar o mês.');
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isUnlocked) {
+      setError('Ação não autorizada. Digite a senha para continuar.');
+      return;
+    }
     if (!targetYearMonth) {
       setError('Por favor, selecione o mês e ano da nova escala.');
       return;
@@ -208,6 +239,106 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
     onClose();
   };
 
+  if (!isOpen) return null;
+
+  // Tela de bloqueio por senha (exige autorização da coordenação para virar o mês)
+  if (!isUnlocked) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs overflow-y-auto">
+        <div className="bg-[#FBF9F2] w-full max-w-md rounded-2xl shadow-2xl border-2 border-[#123C6B]/30 overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-[#1E2A3F]">
+          {/* Cabeçalho da Autenticação */}
+          <div className="bg-[#123C6B] text-white px-5 sm:px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-[#F6D269]/20 flex items-center justify-center border border-[#F6D269]/40">
+                <Lock className="w-4 h-4 text-[#F6D269]" />
+              </div>
+              <div>
+                <h3 className="font-serif font-bold text-base text-white leading-tight">
+                  Acesso Restrito — Virada de Mês
+                </h3>
+                <p className="text-[11px] font-mono text-[#F6D269]">
+                  Autorização de Coordenação
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-white/70 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+              title="Fechar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleUnlock} className="p-5 sm:p-6 space-y-4">
+            <div className="bg-[#123C6B]/10 border border-[#123C6B]/20 rounded-xl p-3.5 text-xs text-[#123C6B] flex items-start gap-2.5 leading-relaxed">
+              <ShieldAlert className="w-4 h-4 text-[#123C6B] flex-shrink-0 mt-0.5" />
+              <div>
+                <strong>Ação Restrita à Coordenação:</strong> A virada de mês inicia uma nova escala e limpa as vagas de voluntários na tela. Insira a senha para prosseguir.
+              </div>
+            </div>
+
+            {authError && (
+              <div className="bg-red-50 border border-red-300 text-red-700 px-3.5 py-2.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 animate-in fade-in duration-200">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-mono font-bold uppercase tracking-wider text-[#123C6B] mb-1.5">
+                Senha de Autorização:
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (authError) setAuthError('');
+                  }}
+                  placeholder="Digite a senha (ex: DS17)"
+                  autoFocus
+                  required
+                  className="w-full bg-white border border-[#A9834C]/50 focus:border-[#123C6B] rounded-lg px-3.5 py-2.5 pr-10 text-sm font-mono font-bold text-[#123C6B] outline-none shadow-2xs transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#123C6B] transition-colors p-1"
+                  title={showPassword ? 'Ocultar senha' : 'Ver senha'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] font-mono text-gray-500 mt-1.5">
+                💡 A senha aceita caixa baixa ou alta (<code className="bg-black/5 px-1 rounded">ds17</code> ou <code className="bg-black/5 px-1 rounded">DS17</code>).
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-[#1E2A3F]/15 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-full font-mono text-xs font-semibold text-[#4A5568] hover:bg-black/5 cursor-pointer transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] border border-[#8A6A38] shadow-md hover:brightness-105 cursor-pointer transition-all"
+              >
+                <KeyRound className="w-4 h-4 text-[#2A1F0A]" />
+                <span>Desbloquear</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs overflow-y-auto">
       <div className="bg-[#FBF9F2] w-full max-w-2xl rounded-2xl shadow-2xl border-2 border-[#123C6B]/20 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-200 text-[#1E2A3F]">
@@ -216,9 +347,14 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
           <div className="flex items-center gap-2.5">
             <CalendarDays className="w-5 h-5 text-[#F6D269]" />
             <div>
-              <h3 className="font-serif font-bold text-lg text-white leading-tight">
-                Virada de Mês — Nova Escala de Visitas
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-serif font-bold text-lg text-white leading-tight">
+                  Virada de Mês — Nova Escala de Visitas
+                </h3>
+                <span className="text-[10px] font-mono font-bold bg-[#DEE9E2] text-green-800 border border-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-green-700" /> Acesso Autorizado
+                </span>
+              </div>
               <p className="text-[11px] font-mono text-[#F6D269]">
                 Planejar escala com dados e resumos limpos
               </p>

@@ -213,3 +213,22 @@ assert.strictEqual(previousMonthVisits[0].visitSummary, 'Visita muito boa');
 assert.strictEqual(previousMonthVisits[0].isCompleted, true);
 
 console.log('✅ 4. Testes de virada do mês, limpeza e preservação de histórico passaram com 100% de sucesso!');
+
+console.log('\n--- Teste 5: Trava de Segurança por Senha para Virada de Mês (ds17, case-insensitive) ---');
+const ROLLOVER_PASSWORD = 'ds17';
+function validateRolloverPassword(input) {
+  if (!input) return false;
+  return input.trim().toLowerCase() === ROLLOVER_PASSWORD.toLowerCase();
+}
+
+assert.strictEqual(validateRolloverPassword('ds17'), true, 'Deve aceitar ds17 minúsculo');
+assert.strictEqual(validateRolloverPassword('DS17'), true, 'Deve aceitar DS17 maiúsculo');
+assert.strictEqual(validateRolloverPassword('Ds17'), true, 'Deve aceitar Ds17 misto');
+assert.strictEqual(validateRolloverPassword('dS17'), true, 'Deve aceitar dS17 misto');
+assert.strictEqual(validateRolloverPassword('  ds17  '), true, 'Deve aceitar com espaços ao redor');
+assert.strictEqual(validateRolloverPassword('  DS17  '), true, 'Deve aceitar maiúsculo com espaços');
+assert.strictEqual(validateRolloverPassword('1234'), false, 'Deve rejeitar senha incorreta');
+assert.strictEqual(validateRolloverPassword('ds18'), false, 'Deve rejeitar senha próxima incorreta');
+assert.strictEqual(validateRolloverPassword(''), false, 'Deve rejeitar vazio');
+assert.strictEqual(validateRolloverPassword(null), false, 'Deve rejeitar nulo');
+console.log('✅ 5. Testes de validação de senha para virada de mês passaram com 100% de sucesso!');

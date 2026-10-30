@@ -208,6 +208,17 @@ git push origin main
 - **Edição Flexível:** Permite alterar datas, horários, nomes, endereços e quantidade de vagas, ou adicionar/remover instituições livremente.
 - **Publicação Direta:** O botão **"Confirmar e Iniciar Escala de [Mês]"** grava tudo no Supabase com isolamento de IDs e preservação integral dos meses anteriores.
 
+### 5. Trava de Segurança por Senha para Virada de Mês / Nova Escala
+- **Motivo & Princípio:** Evitar alterações não autorizadas ou cliques acidentais que possam criar escalas e limpar vagas na tela.
+- **Senha Homologada:** `ds17`
+- **Sensibilidade a Maiúsculas:** Totalmente insensível (`case-insensitive`), aceitando tanto caixa baixa (`ds17`) quanto caixa alta (`DS17`, `Ds17`, `dS17`), com tratamento de espaços acidentais (`.trim()`).
+- **Implementação:**
+  - `src/lib/validation.ts`: constantes `ROLLOVER_PASSWORD` e função `validateRolloverPassword()`.
+  - `src/components/MonthRolloverModal.tsx`: tela inicial de autenticação com cabeçalho clássico em azul marinho (`#123C6B`), ícone de cadeado (`Lock`), alerta explicativo e input com alternador de visibilidade (olho).
+  - Bloqueio completo da tela de configuração até a confirmação correta da senha.
+  - Ao fechar o modal ou confirmar a escala, o estado de desbloqueio é reiniciado por segurança.
+  - Indicador visual nos botões da barra superior e do card de mês vazio com ícone `Lock`.
+
 
 
 

@@ -97,3 +97,14 @@ export function sanitizeSlots(slots: string[]): string[] {
     return trimmed;
   });
 }
+
+/**
+ * Senha oficial de autorização para virar o mês / iniciar nova escala.
+ * Aceita caixa baixa ou alta (case-insensitive: "ds17", "DS17", "Ds17", etc.)
+ */
+export const ROLLOVER_PASSWORD = 'ds17';
+
+export function validateRolloverPassword(input: string): boolean {
+  if (!input) return false;
+  return input.trim().toLowerCase() === ROLLOVER_PASSWORD.toLowerCase();
+}

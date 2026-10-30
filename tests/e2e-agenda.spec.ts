@@ -206,4 +206,45 @@ test.describe('Agenda de Visitas A.A. — Testes de Utilização e Edição de V
     // Resumo deve ser renderizado no card
     await expect(page.locator('text=Reunião muito produtiva com 12 internos presentes')).toBeVisible();
   });
+
+  test('Deve exigir senha (ds17 / DS17) para virar mês ou iniciar nova escala', async ({ page }) => {
+    // Garante carregamento da página
+    await expect(page.locator('#editBtn')).toBeVisible();
+
+    // Clica no botão de Virar Mês / Nova Escala
+    const rolloverBtn = page.locator('button:has-text("Virar Mês / Nova Escala")').first();
+    await expect(rolloverBtn).toBeVisible();
+    await rolloverBtn.click();
+
+    // 1. Deve abrir a tela de bloqueio com pedido de senha
+    const lockHeader = page.locator('h3:has-text("Acesso Restrito — Virada de Mês")');
+    await expect(lockHeader).toBeVisible();
+
+    const passwordInput = page.locator('input[placeholder*="Digite a senha"]');
+    await expect(passwordInput).toBeVisible();
+
+    // 2. Testar senha errada
+    await passwordInput.fill('errada123');
+    await passwordInput.press('Enter');
+
+    const errorAlert = page.locator('text=Senha incorreta! Acesso não autorizado para virar o mês.');
+    await expect(errorAlert).toBeVisible();
+
+    // 3. Testar senha correta em maiúsculas (DS17) para verificar case-insensitivity
+    await passwordInput.fill('DS17');
+    await passwordInput.press('Enter');
+
+    // 4. Modal deve desbloquear e exibir a tela de configuração com selo de Acesso Autorizado
+    await expect(page.locator('text=Acesso Autorizado')).toBeVisible();
+    await expect(page.locator('h3:has-text("Virada de Mês — Nova Escala de Visitas")')).toBeVisible();
+
+    // 5. Fecha o modal
+    const closeBtn = page.locator('button[title="Fechar"]').first();
+    await closeBtn.click();
+    await expect(page.locator('text=Virada de Mês — Nova Escala de Visitas')).not.toBeVisible();
+
+    // 6. Ao reabrir, deve estar bloqueado novamente exigindo senha
+    await rolloverBtn.click();
+    await expect(lockHeader).toBeVisible();
+  });
 });

@@ -42,6 +42,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Lock,
 } from 'lucide-react';
 
 const CURRENT_STORAGE_KEY = 'escala_visitas_aa_data_v10';
@@ -785,9 +786,9 @@ export default function App() {
               type="button"
               onClick={() => setRolloverModalOpen(true)}
               className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] border border-[#8A6A38] shadow-md hover:brightness-105 transition-all cursor-pointer"
-              title="Virar o mês e planejar nova escala com vagas e resumos limpos"
+              title="Virar o mês e planejar nova escala (Ação restrita — requer senha)"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-[#2A1F0A]" />
+              <Lock className="w-3.5 h-3.5 text-[#2A1F0A]" />
               <span>Virar Mês / Nova Escala</span>
             </button>
           </div>
@@ -810,8 +811,9 @@ export default function App() {
                 type="button"
                 onClick={() => setRolloverModalOpen(true)}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-xs font-bold uppercase tracking-wider bg-gradient-to-br from-[#E4C687] to-[#C7A25C] text-[#2A1F0A] border border-[#8A6A38] shadow-md hover:brightness-105 cursor-pointer transition-all"
+                title="Iniciar escala (Ação restrita — requer senha)"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <Lock className="w-3.5 h-3.5" />
                 <span>Iniciar Escala de {formatMonthYearBr(selectedMonth)}</span>
               </button>
             </div>
