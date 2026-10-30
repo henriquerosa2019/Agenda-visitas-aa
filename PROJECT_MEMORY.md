@@ -215,6 +215,7 @@ git push origin main
 - **Implementação:**
   - `src/lib/validation.ts`: constantes `ROLLOVER_PASSWORD` e função `validateRolloverPassword()`.
   - `src/components/MonthRolloverModal.tsx`: tela inicial de autenticação com cabeçalho clássico em azul marinho (`#123C6B`), ícone de cadeado (`Lock`), alerta explicativo e input com alternador de visibilidade (olho).
+  - **Privacidade & Segurança da Senha:** Removidas todas as sugestões e dicas visuais da senha (sem `(ex: DS17)` no placeholder e sem parágrafo de instrução revelando a senha). Atributos `autoComplete="off"`, `autoCapitalize="none"`, `autoCorrect="off"` e `spellCheck={false}` configurados para evitar sugestões do navegador, preservando integralmente o botão com o ícone de olho (`Eye`/`EyeOff`) para checagem da senha digitada.
   - Bloqueio completo da tela de configuração até a confirmação correta da senha.
   - Ao fechar o modal ou confirmar a escala, o estado de desbloqueio é reiniciado por segurança.
   - Indicador visual nos botões da barra superior e do card de mês vazio com ícone `Lock`.

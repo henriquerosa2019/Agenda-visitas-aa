@@ -298,7 +298,11 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
                     setPasswordInput(e.target.value);
                     if (authError) setAuthError('');
                   }}
-                  placeholder="Digite a senha (ex: DS17)"
+                  placeholder="Digite a senha"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   autoFocus
                   required
                   className="w-full bg-white border border-[#A9834C]/50 focus:border-[#123C6B] rounded-lg px-3.5 py-2.5 pr-10 text-sm font-mono font-bold text-[#123C6B] outline-none shadow-2xs transition-colors"
@@ -312,9 +316,6 @@ export const MonthRolloverModal: React.FC<MonthRolloverModalProps> = ({
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[11px] font-mono text-gray-500 mt-1.5">
-                💡 A senha aceita caixa baixa ou alta (<code className="bg-black/5 px-1 rounded">ds17</code> ou <code className="bg-black/5 px-1 rounded">DS17</code>).
-              </p>
             </div>
 
             <div className="pt-3 border-t border-[#1E2A3F]/15 flex items-center justify-end gap-2.5">
