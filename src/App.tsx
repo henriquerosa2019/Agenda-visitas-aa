@@ -26,6 +26,7 @@ import {
   mergeLocalAndRemoteVisits,
 } from './lib/supabase';
 import { isDuplicateVolunteer, sanitizeSlots } from './lib/validation';
+import { notifyVolunteerChanges } from './lib/notifications';
 import {
   FileText,
   CheckCircle2,
@@ -109,6 +110,8 @@ export default function App() {
   const debounceTimers = useRef<{ [key: string]: any }>({});
   // Referência com os dados mais recentes de cada visita para evitar stale closure ao salvar/flush
   const pendingVisitsRef = useRef<{ [visitId: string]: VisitItem }>({});
+  // Guarda o último estado persistido de cada visita para detectar entradas/saídas de voluntários
+  const lastPersistedVisitsRef = useRef<{ [visitId: string]: VisitItem }>({});
 
   // Toast de feedback visual após salvar
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -206,6 +209,10 @@ export default function App() {
           slots: sanitizeSlots(v.slots || []),
         }));
 
+        cleanVisits.forEach((v) => {
+          lastPersistedVisitsRef.current[v.id] = v;
+        });
+
         setState((prev) => ({
           ...prev,
           visits: sortVisitsAscending(cleanVisits),
@@ -253,6 +260,11 @@ export default function App() {
     const unsubscribe = subscribeToVisitsChanges(async () => {
       const updated = await fetchVisitsFromSupabase();
       if (updated && updated.length > 0) {
+        updated.forEach((v) => {
+          if (!pendingVisitsRef.current[v.id]) {
+            lastPersistedVisitsRef.current[v.id] = v;
+          }
+        });
         setState((prev) => {
           const merged = updated.map((remoteV) => {
             if (pendingVisitsRef.current[remoteV.id]) {
@@ -276,10 +288,32 @@ export default function App() {
     };
   }, []);
 
-  // Helper para persistir visita no Supabase
+  // Helper para persistir visita no Supabase e enviar e-mails de notificação pelo Brevo
   const persistVisit = async (visit: VisitItem) => {
     const client = getSupabaseClient();
     if (!client) return;
+
+    // Detectar novos voluntários adicionados ou voluntários que desmarcaram
+    const previous = lastPersistedVisitsRef.current[visit.id];
+    if (previous) {
+      const prevSlots = (previous.slots || []).map((s) => (s || '').trim()).filter(Boolean);
+      const newSlots = (visit.slots || []).map((s) => (s || '').trim()).filter(Boolean);
+
+      const added = newSlots.filter((s) => !prevSlots.includes(s));
+      const removed = prevSlots.filter((s) => !newSlots.includes(s));
+
+      if (added.length > 0 || removed.length > 0) {
+        notifyVolunteerChanges({
+          venue: visit.name,
+          date: visit.date,
+          time: visit.time,
+          added,
+          removed,
+        });
+      }
+    }
+
+    lastPersistedVisitsRef.current[visit.id] = visit;
 
     setSyncStatus('syncing');
     const success = await upsertVisitToSupabase(visit);

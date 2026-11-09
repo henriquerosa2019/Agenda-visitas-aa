@@ -88,9 +88,10 @@ git push origin main
 - **Henrique Rosa:** `henrique.rosa@poli.ufrj.br`
 - **Danilo Diniz:** `dinizdanfer@gmail.com`
 
-### 2. Notificações em Tempo Real (Supabase ➔ Brevo API)
-- **Gatilho no Banco:** Trigger PostgreSQL `on_volunteer_change` na tabela `public.aa_visits` (executa a função `public.tr_notify_volunteer_changes()`).
-- **Extensão Utilizada:** `pg_net` executando chamadas HTTP assíncronas no schema `net` (`net.http_post`) para a API REST v3 do Brevo (`https://api.brevo.com/v3/smtp/email`).
+### 2. Notificações em Tempo Real (Vercel Serverless Function & Supabase ➔ Brevo API)
+- **API Serverless Oficial (`api/notify-volunteer.js`):** Endpoint serverless na Vercel chamado automaticamente pela aplicação no ato de persistência de cada vaga (`persistVisit` em `src/App.tsx`).
+- **Garantia de Entrega:** Não depende de chamadas externas do banco. Sempre que um voluntário for adicionado ou removido pelo app (mobile ou desktop), a chamada dispara assincronamente em segundo plano, enviando o e-mail oficial via Brevo (com contingência para Resend).
+- **Gatilho de Banco (Opcional/Redundante):** O script `scripts/supabase-trigger-setup.sql` contém a função PostgreSQL corrigida (`net.http_post` no schema `net`) e o trigger `on_volunteer_change` na tabela `public.aa_visits` para caso o banco seja alterado diretamente via SQL Editor.
 - **Cenários Cobertos:**
   1. **Novo Voluntário Cadastrado:** Detecta novos nomes inseridos nas vagas e envia e-mail comemorativo/informativo com presença confirmada.
   2. **Voluntário Retirou o Nome:** Detecta nomes apagados/removidos e envia e-mail de atenção informando a desistência e que a vaga reabriu.
@@ -98,10 +99,6 @@ git push origin main
 - **Regra de Ouro no Brevo (IPs Autorizados):**
   - **IMPORTANTE:** A opção de segurança *"Bloquear endereços IP não autorizados para Chaves API"* em `https://app.brevo.com/security/authorised_ips` **DEVE PERMANECER DESATIVADA**.
   - **Motivo:** O Supabase roda na nuvem da AWS com IPs dinâmicos (ex: IPv6 `2600:1f16:...`). Se a trava de IP estiver ligada, o Brevo rejeita as chamadas do banco com `status_code: 401 (unauthorized)`. Com a trava desativada, o Brevo aceita as requisições autenticadas exclusivamente pela chave secreta da API com `status_code: 200/201`.
-- **Auditoria Técnica do Disparo:** As respostas HTTP de cada disparo do gatilho ficam registradas no banco e podem ser consultadas no SQL Editor via:
-  ```sql
-  select id, status_code, content, created from net._http_response order by created desc limit 5;
-  ```
 
 ### 3. Relatório Periódico Consolidado (GitHub Actions ➔ Brevo API)
 - **Despertador / Cron:** `.github/workflows/daily-analysis.yml`
