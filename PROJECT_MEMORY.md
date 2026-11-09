@@ -75,7 +75,8 @@ git push origin main
 
 ## ⏰ Diretriz Permanente do Agendador de Tarefas do Assistente
 - **Autonomia Total:** Sempre que qualquer tarefa for agendada pelo assistente no projeto, ela deve ser configurada e executada de forma **100% autônoma**, sem requerer intervenção manual, confirmação ou cliques do usuário.
-- **Horário e Formato Definidos:** A execução ocorre periodicamente: **Todos os dias às 08:00** (horário de Brasília) via GitHub Actions e Agendador de Tarefas do Windows, com o escopo completo: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados (unificados), 4. Locais Agendados (apenas agendados com dia/hora), 5. Status dos Resumos.
+- **Horário e Formato Definidos:** A execução ocorre periodicamente: **Todos os dias às 08:00** (horário de Brasília) via GitHub Actions e Agendador de Tarefas do Windows, com o escopo completo: 1. Resumo Geral, 2. Status das Vagas, 3. Voluntários Agendados (unificados), 4. Locais Agendados (apenas agendados com dia/hora), 5. Status dos Resumos, 6. Monitoramento e Auditoria Diária do Gatilho & Notificações (Supabase & Brevo).
+- **Auditoria Diária do Gatilho & Notificações (Diretriz Permanente):** Toda execução diária valida ativamente a conectividade com a tabela `public.aa_visits` do Supabase e a autenticação com a API do Brevo (`/v3/account`), reportando o status na Seção 6 e alertando os coordenadores em caso de anomalia.
 - **Persistência de Histórico:** Resultados automáticos são gravados em `RELATORIO_VISITAS.md`.
 - **Disparo em Tempo Real pelo Supabase:** A inclusão e desmarcação de voluntários dispara e-mails imediatamente via Trigger SQL no Supabase. O relatório geral completo é disparado diariamente às 08:00 (e sob demanda ao clicar na tarefa).
 - **Prevenção de Inatividade do Supabase:** A execução diária do cron do GitHub Actions às 08:00 faz uma leitura no Supabase que mantém o projeto ativo, evitando que ele pause por inatividade no plano Free.

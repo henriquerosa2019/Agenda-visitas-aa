@@ -154,6 +154,69 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+async function checkTriggerAndNotificationHealth(brevoKey, supabaseClient) {
+  const result = {
+    supabaseOk: false,
+    supabaseMessage: '',
+    brevoOk: false,
+    brevoEmail: '',
+    brevoStatus: 0,
+    brevoMessage: '',
+    status: 'ok',
+    summary: '',
+  };
+
+  // 1. Checar conectividade e integridade da tabela aa_visits no Supabase
+  try {
+    const { data, error } = await supabaseClient.from('aa_visits').select('id').limit(1);
+    if (!error && Array.isArray(data)) {
+      result.supabaseOk = true;
+      result.supabaseMessage = 'Conectado e íntegro';
+    } else {
+      result.supabaseMessage = error ? error.message : 'Sem resposta do banco';
+    }
+  } catch (err) {
+    result.supabaseMessage = err.message;
+  }
+
+  // 2. Checar autenticação e integridade da API Brevo (transacional)
+  if (brevoKey) {
+    try {
+      const resp = await fetch('https://api.brevo.com/v3/account', {
+        method: 'GET',
+        headers: {
+          'api-key': brevoKey,
+          accept: 'application/json',
+        },
+      });
+      result.brevoStatus = resp.status;
+      if (resp.ok) {
+        const data = await resp.json();
+        result.brevoOk = true;
+        result.brevoEmail = data.email || 'Autenticado';
+        result.brevoMessage = `200 OK (${result.brevoEmail})`;
+      } else {
+        const errJson = await resp.json().catch(() => ({}));
+        result.brevoMessage = errJson.message || `Erro HTTP ${resp.status}`;
+      }
+    } catch (err) {
+      result.brevoMessage = err.message;
+    }
+  } else {
+    result.brevoMessage = 'BREVO_API_KEY ausente';
+  }
+
+  if (result.supabaseOk && result.brevoOk) {
+    result.status = 'ok';
+    result.summary = '🟢 Gatilho & Notificações 100% Operacionais';
+  } else {
+    result.status = 'error';
+    result.summary = '⚠️ Alerta no Pipeline de Notificações / Gatilho';
+  }
+
+  return result;
+}
+
 async function sendReportEmail({
   now,
   dateFormatted,
@@ -172,6 +235,7 @@ async function sendReportEmail({
   visits,
   visitasComResumo,
   visitasSemResumo,
+  healthStatus,
 }) {
   const brevoKey = (process.env.BREVO_API_KEY || '').trim();
   const resendKey = (process.env.RESEND_API_KEY || '').trim();
@@ -191,7 +255,9 @@ async function sendReportEmail({
     return;
   }
 
-  const emailSubject = visitasDeHoje && visitasDeHoje.length > 0
+  const emailSubject = healthStatus && healthStatus.status !== 'ok'
+    ? `⚠️ [ALERTA GATILHO/BREVO] Escala de Visitas A.A. — ${dateFormatted}`
+    : visitasDeHoje && visitasDeHoje.length > 0
     ? `🔔 [HOJE TEM VISITA] Escala de Visitas A.A. — ${dateFormatted}`
     : `📊 Relatório Diário de Visitas A.A. — ${dateFormatted}`;
 
@@ -424,6 +490,20 @@ async function sendReportEmail({
         </table>
         ${relatosConcluidosHtml}
         ${pendenciasHtml}
+      </div>
+
+      <!-- Seção 6: Auditoria do Gatilho & Notificações -->
+      <div style="margin-bottom: 24px; padding: 14px 16px; background-color: ${healthStatus?.status === 'ok' ? '#F0FDF4' : '#FEF2F2'}; border-left: 4px solid ${healthStatus?.status === 'ok' ? '#16A34A' : '#DC2626'}; border-radius: 6px;">
+        <h3 style="margin: 0 0 8px 0; color: #123C6B; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">
+          🔔 6. Monitoramento Diário do Gatilho & Notificações
+        </h3>
+        <p style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold; color: ${healthStatus?.status === 'ok' ? '#15803D' : '#B91C1C'};">
+          ${healthStatus?.summary || 'Auditoria Concluída'}
+        </p>
+        <div style="font-size: 12px; color: #475569; line-height: 1.5;">
+          <div>• <strong>Banco Supabase (aa_visits):</strong> ${healthStatus?.supabaseMessage || 'OK'}</div>
+          <div>• <strong>API Brevo (Transacional):</strong> ${healthStatus?.brevoMessage || 'OK'}</div>
+        </div>
       </div>
 
       <!-- Botão de Ação -->
@@ -1015,6 +1095,14 @@ export async function runVisitsAnalysis() {
     });
   }
 
+  const brevoKey = (process.env.BREVO_API_KEY || '').trim();
+  const healthStatus = await checkTriggerAndNotificationHealth(brevoKey, supabase);
+
+  console.log(`\n🔔 6. AUDITORIA DIÁRIA DO GATILHO & NOTIFICAÇÕES (BREVO & SUPABASE):`);
+  console.log(`   • Banco de Dados (Supabase aa_visits): ${healthStatus.supabaseOk ? '🟢 ' + healthStatus.supabaseMessage : '❌ Falha: ' + healthStatus.supabaseMessage}`);
+  console.log(`   • Autenticação API Brevo:              ${healthStatus.brevoOk ? '🟢 ' + healthStatus.brevoMessage : '❌ Erro: ' + healthStatus.brevoMessage}`);
+  console.log(`   • Status Geral do Pipeline:            ${healthStatus.status === 'ok' ? '🟢 100% Operacional' : '⚠️ ' + healthStatus.summary}`);
+
   console.log('\n' + '='.repeat(68));
   console.log(`  ✅ Análise diária concluída com sucesso.`);
   console.log('='.repeat(68));
@@ -1207,6 +1295,11 @@ ${
       visitasSemResumo.map((v) => `  - ⚠️ *[${formatBrDate(v.date)} às ${v.time}]* ${v.name}`).join('\n')
     : ''
 }
+
+## 🔔 6. Monitoramento Diário do Gatilho & Notificações
+- **Banco de Dados (Supabase aa_visits):** ${healthStatus.supabaseOk ? '🟢 Conectado e íntegro' : '❌ Falha: ' + healthStatus.supabaseMessage}
+- **Autenticação & Envio (Brevo):** ${healthStatus.brevoOk ? '🟢 100% Operacional (' + healthStatus.brevoEmail + ')' : '❌ Erro: ' + healthStatus.brevoMessage}
+- **Status Geral do Pipeline:** ${healthStatus.status === 'ok' ? '🟢 100% Operacional' : '⚠️ ' + healthStatus.summary}
 ${fimDeMesMarkdownSection}
 `;
   try {
@@ -1235,6 +1328,7 @@ ${fimDeMesMarkdownSection}
       visits,
       visitasComResumo,
       visitasSemResumo,
+      healthStatus,
     });
   }
 
